@@ -1,18 +1,17 @@
 opam-version: "1.2"
-maintainer: "stephen.dolan@cl.cam.ac.uk"
-authors: ["Stephen Dolan"]
-homepage: "https://github.com/stedolan/crowbar"
-bug-reports: "https://github.com/stedolan/crowbar/issues"
-dev-repo: "https://github.com/stedolan/crowbar.git"
+maintainer: "ohno@somerandomidiot.com"
+authors: []
+homepage: ""
+bug-reports: ""
+dev-repo: ""
 license: "MIT"
 build:
-[[ "ocaml" "pkg/pkg.ml" "build"
-           "--pinned" "%{pinned}%" "-n" "ppx_deriving_crowbar"]]
+[[ "make" ]]
 available: [ ocaml-version >= "4.05" ]
 depends: [
   "ocamlbuild" {build}
   "ocamlfind" {build}
   "topkg" {build & >= "0.7.4"}
-  "ppx_deriving"
+  "ppx_deriving" { >= "4.2" }
   "crowbar"
 ]

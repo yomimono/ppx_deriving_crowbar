@@ -6,10 +6,10 @@ let ocamlbuild =
   "ocamlbuild -use-ocamlfind -classic-display -plugin-tag 'package(cppo_ocamlbuild)'"
 
 let () =
-  Pkg.describe "ppx_deriving_cmdliner" ~builder:(`Other (ocamlbuild, "_build")) [
+  Pkg.describe "ppx_deriving_crowbar" ~builder:(`Other (ocamlbuild, "_build")) [
     Pkg.lib "pkg/META";
-    Pkg.lib ~exts:Exts.library "src/ppx_deriving_cmdliner";
-    Pkg.lib ~exts:Exts.module_library "src/ppx_deriving_cmdliner_runtime";
+    Pkg.lib ~exts:Exts.library "src/ppx_deriving_crowbar";
+    Pkg.lib ~exts:Exts.module_library "src/ppx_deriving_crowbar_runtime";
     Pkg.doc "README.md";
     Pkg.doc "LICENSE.txt";
-    Pkg.doc "CHANGELOG.md"; ]
+    Pkg.doc "CHANGES.md"; ]
