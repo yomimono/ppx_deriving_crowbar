@@ -49,6 +49,46 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
+    | Ptype_variant constrs, _ ->
+      (* TODO: this is also lifted wholesale from ppx_deriving_eq.cppo.ml *)
+      let argn kind =
+        Printf.sprintf (match kind with `lhs -> "lhs%d" | `rhs -> "rhs%d")
+      in
+      let argl kind =
+        Printf.sprintf (match kind with `lhs -> "lhs%s" | `rhs -> "rhs%s")
+      in
+      let pattn side typs =
+        List.mapi (fun i _ -> pvar (argn side i)) typs in
+      let pattl side labels =
+        List.map (fun { pld_name = { txt = n } } -> n, pvar (argl side n)) labels in
+      let rec exprn quoter typs =
+        typs |> List.mapi (fun i typ ->
+            app (expr_of_typ quoter typ) [evar (argn `lhs i); evar (argn `rhs i)])
+      and exprl quoter typs =
+        typs |> List.map (fun { pld_name = { txt = n }; pld_type = typ } ->
+            app (expr_of_typ quoter typ) [evar (argl `lhs n); evar (argl `rhs n)])
+      in
+      let pconstrrec name fields =
+        pconstr name [precord ~closed:Closed fields]
+      in
+      let cases =
+        (constrs |> List.map (fun { pcd_name = { txt = name }; pcd_args; pcd_loc } ->
+          with_default_loc pcd_loc @@ fun () ->
+          match pcd_args with
+          | Pcstr_tuple(typs) ->
+            exprn quoter typs |>
+            Ppx_deriving.(fold_exprs ~unit:[%expr true] (binop_reduce [%expr (&&)])) |>
+            Exp.case (ptuple [pconstr name (pattn `lhs typs);
+                              pconstr name (pattn `rhs typs)])
+          | Pcstr_record(labels) ->
+            exprl quoter labels |>
+            Ppx_deriving.(fold_exprs ~unit:[%expr true] (binop_reduce [%expr (&&)])) |>
+            Exp.case (ptuple [pconstrrec name (pattl `lhs labels);
+                              pconstrrec name (pattl `rhs labels)])
+          )) @
+        [Exp.case (pvar "_") [%expr false]]
+      in
+      [%expr fun lhs rhs -> [%e Exp.match_ [%expr lhs, rhs] cases]]
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
