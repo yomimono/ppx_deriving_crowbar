@@ -17,19 +17,19 @@ let rec expr_of_typ quoter typ =
   let typ = Ppx_deriving.remove_pervasives ~deriver typ in
   match typ with
   | {ptyp_desc = Ptyp_constr _ } ->
-    let builtin = not (attr_nobuiltin typ.ptyp_attributes) in
-    begin match builtin, typ with
-      | true, [%type: unit] -> [%expr fun () -> ()]
-      | true, [%type: int] -> [%expr Crowbar.int]
-      | true, [%type: int32]
-      | true, [%type: Int32.t] -> [%expr Crowbar.int32]
-      | true, [%type: int64]
-      | true, [%type: Int64.t] -> [%expr Crowbar.int64]
-      | true, [%type: float] -> [%expr Crowbar.float]
-      | true, [%type: bool] -> [%expr Crowbar.bool]
-      | true, [%type: char] -> [%expr Crowbar.(map [uint8] Char.chr)]
-      | true, [%type: string]
-      | true, [%type: String.t] -> [%expr Crowbar.bytes]
+    begin
+      match typ with
+    | [%type: unit] -> [%expr Crowbar.const ()]
+    | [%type: int] -> [%expr Crowbar.int]
+    | [%type: int32]
+    | [%type: Int32.t] -> [%expr Crowbar.int32]
+    | [%type: int64]
+    | [%type: Int64.t] -> [%expr Crowbar.int64]
+    | [%type: float] -> [%expr Crowbar.float]
+    | [%type: bool] -> [%expr Crowbar.bool]
+    | [%type: char] -> [%expr Crowbar.(map [uint8] Char.chr)]
+    | [%type: string]
+    | [%type: String.t] -> [%expr Crowbar.bytes]
     end
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
@@ -38,9 +38,9 @@ let rec expr_of_typ quoter typ =
 let core_type_of_decl ~options ~path type_decl =
   let typ = Ppx_deriving.core_type_of_type_decl type_decl in
   Ppx_deriving.poly_arrow_of_type_decl
-    (fun var -> [%type: [%t var] -> [%t var] -> Ppx_deriving_runtime.bool])
+    (fun var -> [%type: [%t var] Crowbar.gen])
     type_decl
-    [%type: [%t typ] -> [%t typ] -> Ppx_deriving_runtime.bool]
+    [%type: [%t typ] Crowbar.gen]
 
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
@@ -50,45 +50,26 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
     | Ptype_variant constrs, _ ->
-      (* TODO: this is also lifted wholesale from ppx_deriving_eq.cppo.ml *)
-      let argn kind =
-        Printf.sprintf (match kind with `lhs -> "lhs%d" | `rhs -> "rhs%d")
-      in
-      let argl kind =
-        Printf.sprintf (match kind with `lhs -> "lhs%s" | `rhs -> "rhs%s")
-      in
-      let pattn side typs =
-        List.mapi (fun i _ -> pvar (argn side i)) typs in
-      let pattl side labels =
-        List.map (fun { pld_name = { txt = n } } -> n, pvar (argl side n)) labels in
-      let rec exprn quoter typs =
-        typs |> List.mapi (fun i typ ->
-            app (expr_of_typ quoter typ) [evar (argn `lhs i); evar (argn `rhs i)])
-      and exprl quoter typs =
-        typs |> List.map (fun { pld_name = { txt = n }; pld_type = typ } ->
-            app (expr_of_typ quoter typ) [evar (argl `lhs n); evar (argl `rhs n)])
-      in
-      let pconstrrec name fields =
-        pconstr name [precord ~closed:Closed fields]
-      in
-      let cases =
-        (constrs |> List.map (fun { pcd_name = { txt = name }; pcd_args; pcd_loc } ->
-          with_default_loc pcd_loc @@ fun () ->
-          match pcd_args with
-          | Pcstr_tuple(typs) ->
-            exprn quoter typs |>
-            Ppx_deriving.(fold_exprs ~unit:[%expr true] (binop_reduce [%expr (&&)])) |>
-            Exp.case (ptuple [pconstr name (pattn `lhs typs);
-                              pconstr name (pattn `rhs typs)])
-          | Pcstr_record(labels) ->
-            exprl quoter labels |>
-            Ppx_deriving.(fold_exprs ~unit:[%expr true] (binop_reduce [%expr (&&)])) |>
-            Exp.case (ptuple [pconstrrec name (pattl `lhs labels);
-                              pconstrrec name (pattl `rhs labels)])
-          )) @
-        [Exp.case (pvar "_") [%expr false]]
-      in
-      [%expr fun lhs rhs -> [%e Exp.match_ [%expr lhs, rhs] cases]]
+      (* we must be sure that there are generators for all of the possible
+         variant types, and then invoke Crowbar.choose on the list of them. *)
+      let cases = constrs |> List.map (fun {pcd_res; pcd_args} ->
+          (* under what circumstances can pcd_res be non-None and pcd_args be
+             populated? *)
+          match pcd_res, pcd_args with
+          | None, Pcstr_tuple [] ->
+            (* C of T1 * ... * Tn *)
+            (* but we have no information on t1, ..., tn :( *)
+            [%expr Crowbar.const ()]
+          | None, Pcstr_tuple l ->
+            Ast_helper.Exp.array (List.map (expr_of_typ quoter) l)
+          | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
+            (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
+            expr_of_typ quoter core_type (* 
+          | None, Pcstr_record labels ->
+            (* C of {...} or C of {...} as t *) *)
+
+        ) in
+      Ast_helper.Exp.array cases
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
