@@ -56,12 +56,21 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
           (* under what circumstances can pcd_res be non-None and pcd_args be
              populated? *)
           match pcd_res, pcd_args with
+          | None, Pcstr_tuple l ->
+            let gens = List.map (expr_of_typ quoter) l in
+            (* we're going to need some slick dancing to deal with this
+               arity situation I think *)
+            [%expr Crowbar.(map [%e gens]
+                              (fun (* output n space-separated unique variable
+                                      names, where n is the length of the tuple
+                                      list *)
+                                -> (* output those same unique variables, but
+                                      separated by ,s *)
+                ()))]
           | None, Pcstr_tuple [] ->
             (* C of T1 * ... * Tn *)
             (* but we have no information on t1, ..., tn :( *)
             [%expr Crowbar.const ()]
-          | None, Pcstr_tuple l ->
-            Ast_helper.Exp.array (List.map (expr_of_typ quoter) l)
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
             expr_of_typ quoter core_type (* 
