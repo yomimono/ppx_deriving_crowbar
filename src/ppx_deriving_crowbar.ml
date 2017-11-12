@@ -52,7 +52,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     | Ptype_variant constrs, _ ->
       (* we must be sure that there are generators for all of the possible
          variant types, and then invoke Crowbar.choose on the list of them. *)
-      let cases = constrs |> List.map (fun {pcd_res; pcd_args} ->
+      let cases = constrs |> List.map (fun {pcd_name; pcd_res; pcd_args} ->
           (* under what circumstances can pcd_res be non-None and pcd_args be
              populated? *)
           match pcd_res, pcd_args with
@@ -70,7 +70,9 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
                    Pexp_ident (Ast_convenience.lid i))
                  (n_vars (List.length tuple) []))
             in
-            Ast_convenience.tuple desc
+            Ast_helper.Exp.construct (Ast_convenience.lid pcd_name.txt)
+              (Some (Ast_convenience.tuple desc))
+            (* wrap that tuple in the constructor *)
             (* TODO: wrap that tuple in `fun a b c d`
             let gens = List.map (expr_of_typ quoter) tuple in
             [%expr Crowbar.(map [%e gens] [%e fn])] *)
@@ -81,7 +83,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             (* C of {...} or C of {...} as t *) *)
 
         ) in
-      Ast_helper.Exp.array cases
+      Ast_helper.Exp.tuple cases
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
