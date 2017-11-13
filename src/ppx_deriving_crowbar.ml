@@ -67,8 +67,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             (* make a tuple of those names *)
             let desc = List.map
                  (fun i -> Ast_helper.Exp.mk @@
-                   Pexp_ident (Ast_convenience.lid i))
-                 vars
+                   Pexp_ident (Ast_convenience.lid i)) vars
             in
             let res = Ast_helper.Exp.construct (Ast_convenience.lid pcd_name.txt)
                 (Some (Ast_convenience.tuple desc))
@@ -78,7 +77,18 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
                 function_body in
             let last_fun = List.fold_right last_fun vars res in
             let gens = List.map (expr_of_typ quoter) tuple in
-            [%expr Crowbar.(map [%e gens] [%e last_fun])]
+            let make_list l =
+              let consify add_me extant =
+              Ast_helper.Exp.(tuple [add_me; construct (Ast_convenience.lid
+                                                          "Crowbar.::")
+                                       (Some extant)])
+              in
+              List.fold_right consify l (Ast_helper.Exp.construct
+                                      (Ast_convenience.lid "Crowbar.[]") None)
+            in
+            (* how do we get all of these gens into the right structure for
+               Crowbar?  It just looks like a list, it isn't really one. *)
+            [%expr Crowbar.(map [%e (make_list gens)] [%e last_fun])]
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
             expr_of_typ quoter core_type (* 
