@@ -73,16 +73,12 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             let res = Ast_helper.Exp.construct (Ast_convenience.lid pcd_name.txt)
                 (Some (Ast_convenience.tuple desc))
             in
-            (* easiest case : how do we get "fun b -> A (a, b)" ?  then we can
-               add "fun a -> " etc around it. *)
             let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
                 (Ast_helper.Pat.var (Location.mknoloc arg))
                 function_body in
-            (* last_fun (List.(hd @@ rev vars)) res *)
-            List.fold_right last_fun vars res
-            (* TODO: wrap that tuple in `fun a b c d` *)
-            (* let gens = List.map (expr_of_typ quoter) tuple in
-            [%expr Crowbar.(map [%e gens] [%e last_fun])] *)
+            let last_fun = List.fold_right last_fun vars res in
+            let gens = List.map (expr_of_typ quoter) tuple in
+            [%expr Crowbar.(map [%e gens] [%e last_fun])]
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
             expr_of_typ quoter core_type (* 
