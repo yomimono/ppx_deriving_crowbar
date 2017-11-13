@@ -75,8 +75,8 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             in
             (* easiest case : how do we get "fun b -> A (a, b)" ?  then we can
                add "fun a -> " etc around it. *)
-            let last_fun = Ast_helper.Exp.fun_ Nolabel None
-                (Ast_helper.Pat.var (Location.mknoloc (List.(hd @@ rev vars))))
+            let last_fun v = Ast_helper.Exp.fun_ Nolabel None
+                (Ast_helper.Pat.var (Location.mknoloc v)))
                 res in
             last_fun
             (* TODO: wrap that tuple in `fun a b c d` *)
