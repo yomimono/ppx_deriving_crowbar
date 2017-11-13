@@ -1,11 +1,14 @@
 type foo = A of int | B of float | C of int * float
 [@@deriving crowbar]
 
+type quux = Q of int | B of foo
+[@@deriving crowbar]
+(* 
 type bar = {
   justice: bool;
   purrs: int;
 }
-[@@deriving crowbar]
+[@@deriving crowbar] *)
 (* 
 let () =
   Crowbar.(add_test ~name:"everything is awesome"

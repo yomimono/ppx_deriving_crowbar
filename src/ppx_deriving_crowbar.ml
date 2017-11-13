@@ -16,20 +16,25 @@ let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
   let typ = Ppx_deriving.remove_pervasives ~deriver typ in
   match typ with
-  | {ptyp_desc = Ptyp_constr _ } ->
+  | { ptyp_desc = Ptyp_constr ({ txt = lid }, args) } ->                        
     begin
       match typ with
-    | [%type: unit] -> [%expr Crowbar.const ()]
+    | [%type: unit] -> [%expr const ()]
     | [%type: int] -> [%expr int]
     | [%type: int32]
-    | [%type: Int32.t] -> [%expr Crowbar.int32]
+    | [%type: Int32.t] -> [%expr int32]
     | [%type: int64]
-    | [%type: Int64.t] -> [%expr Crowbar.int64]
+    | [%type: Int64.t] -> [%expr int64]
     | [%type: float] -> [%expr float]
-    | [%type: bool] -> [%expr Crowbar.bool]
-    | [%type: char] -> [%expr Crowbar.(map [uint8] Char.chr)]
+    | [%type: bool] -> [%expr bool]
+    | [%type: char] -> [%expr (map [uint8] Char.chr)]
     | [%type: string]
-    | [%type: String.t] -> [%expr Crowbar.bytes]
+    | [%type: String.t] -> [%expr bytes]
+    | _ ->
+    let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "generate") lid)))
+        (List.map expr_of_typ args)                                         
+    in                                                                          
+    [%expr [%e fwd]]   
     end
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
@@ -57,6 +62,11 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
+    | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
+                                   non-empty list *)
+      let gens = labels |> List.map (fun {pld_type;} -> expr_of_typ quoter
+                                        pld_type) in
+      Ast_convenience.tuple gens
     | Ptype_variant constrs, _ ->
       (* we must be sure that there are generators for all of the possible
          variant types, and then invoke Crowbar.choose on the list of them. *)
