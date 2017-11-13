@@ -78,7 +78,8 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
                 (Ast_helper.Pat.var (Location.mknoloc arg))
                 function_body in
-            last_fun (List.(hd @@ rev vars)) res
+            (* last_fun (List.(hd @@ rev vars)) res *)
+            List.fold_right last_fun vars res
             (* TODO: wrap that tuple in `fun a b c d` *)
             (* let gens = List.map (expr_of_typ quoter) tuple in
             [%expr Crowbar.(map [%e gens] [%e last_fun])] *)
