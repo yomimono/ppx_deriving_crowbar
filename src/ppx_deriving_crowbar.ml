@@ -96,7 +96,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             (* C of {...} or C of {...} as t *) *)
 
         ) in
-      Ast_helper.Exp.tuple cases
+      [%expr Crowbar.(choose [%e cases])]
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
