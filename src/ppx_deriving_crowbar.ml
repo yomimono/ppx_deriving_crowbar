@@ -20,12 +20,12 @@ let rec expr_of_typ quoter typ =
     begin
       match typ with
     | [%type: unit] -> [%expr Crowbar.const ()]
-    | [%type: int] -> [%expr Crowbar.int]
+    | [%type: int] -> [%expr int]
     | [%type: int32]
     | [%type: Int32.t] -> [%expr Crowbar.int32]
     | [%type: int64]
     | [%type: Int64.t] -> [%expr Crowbar.int64]
-    | [%type: float] -> [%expr Crowbar.float]
+    | [%type: float] -> [%expr float]
     | [%type: bool] -> [%expr Crowbar.bool]
     | [%type: char] -> [%expr Crowbar.(map [uint8] Char.chr)]
     | [%type: string]
@@ -42,14 +42,13 @@ let core_type_of_decl ~options ~path type_decl =
     type_decl
     [%type: [%t typ] Crowbar.gen]
 
-let make_list l =
+let make_crowbar_list l =
   let consify add_me extant =
-    Ast_helper.Exp.(tuple [add_me; construct (Ast_convenience.lid
-                                                "Crowbar.::")
-                             (Some extant)])
+      Ast_helper.Exp.(construct (Ast_convenience.lid "Crowbar.::")
+                        (Some (tuple [add_me; extant])))
   in
-  List.fold_right consify l (Ast_helper.Exp.construct
-                               (Ast_convenience.lid "Crowbar.[]") None)
+  List.fold_right consify l (Ast_helper.Exp.construct (Ast_convenience.lid
+                                                 "Crowbar.[]") None)
 
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
@@ -88,7 +87,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             let gens = List.map (expr_of_typ quoter) tuple in
             (* how do we get all of these gens into the right structure for
                Crowbar?  It just looks like a list, it isn't really one. *)
-            [%expr Crowbar.(map [%e (make_list gens)] [%e last_fun])]
+            [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
             expr_of_typ quoter core_type (* 
@@ -96,7 +95,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             (* C of {...} or C of {...} as t *) *)
 
         ) in
-      [%expr Crowbar.choose [%e (make_list cases)]]
+      [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
