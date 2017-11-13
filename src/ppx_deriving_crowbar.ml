@@ -42,6 +42,15 @@ let core_type_of_decl ~options ~path type_decl =
     type_decl
     [%type: [%t typ] Crowbar.gen]
 
+let make_list l =
+  let consify add_me extant =
+    Ast_helper.Exp.(tuple [add_me; construct (Ast_convenience.lid
+                                                "Crowbar.::")
+                             (Some extant)])
+  in
+  List.fold_right consify l (Ast_helper.Exp.construct
+                               (Ast_convenience.lid "Crowbar.[]") None)
+
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
   let path = Ppx_deriving.path_of_type_decl ~path type_decl in
@@ -77,15 +86,6 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
                 function_body in
             let last_fun = List.fold_right last_fun vars res in
             let gens = List.map (expr_of_typ quoter) tuple in
-            let make_list l =
-              let consify add_me extant =
-              Ast_helper.Exp.(tuple [add_me; construct (Ast_convenience.lid
-                                                          "Crowbar.::")
-                                       (Some extant)])
-              in
-              List.fold_right consify l (Ast_helper.Exp.construct
-                                      (Ast_convenience.lid "Crowbar.[]") None)
-            in
             (* how do we get all of these gens into the right structure for
                Crowbar?  It just looks like a list, it isn't really one. *)
             [%expr Crowbar.(map [%e (make_list gens)] [%e last_fun])]
@@ -96,7 +96,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             (* C of {...} or C of {...} as t *) *)
 
         ) in
-      [%expr Crowbar.(choose [%e cases])]
+      [%expr Crowbar.choose [%e (make_list cases)]]
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
