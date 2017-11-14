@@ -10,6 +10,8 @@ type ploomple = int * float
 type bar = {
   justice: bool;
   purrs: int;
+  fangs: ploomple;
+  rejweo: quux;
 }
 [@@deriving crowbar]
 let () =
