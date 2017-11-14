@@ -25,6 +25,10 @@ let rec n_vars n (l : string list) =
   if n > 0 then n_vars (n-1) ((Ppx_deriving.fresh_var l)::l)
   else List.rev l
 
+let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
+    (Ast_helper.Pat.var (Location.mknoloc arg))
+    function_body
+
 let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
   let typ = Ppx_deriving.remove_pervasives ~deriver typ in
@@ -50,27 +54,23 @@ let rec expr_of_typ quoter typ =
     [%expr [%e fwd]]   
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
-    let gens, last_fun = generate_tuple quoter tuple in
-    [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
+    let gens, vars_to_tuple = generate_tuple quoter tuple in
+    [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
 and generate_tuple quoter ?name tuple =
   let vars = n_vars (List.length tuple) [] in
-  (* make a tuple of those names *)
-  let desc = List.map
+  let vars_tuple = List.map
       (fun i -> Ast_helper.Exp.mk @@
         Pexp_ident (Ast_convenience.lid i)) vars |> Ast_convenience.tuple
   in
-  let res = match name with
-  | Some name -> Ast_helper.Exp.construct name (Some desc)
-  | None -> desc
+  let vars_tuple = match name with
+  | Some name -> Ast_helper.Exp.construct name (Some vars_tuple)
+  | None -> vars_tuple
   in
-  let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
-      (Ast_helper.Pat.var (Location.mknoloc arg))
-      function_body in
-  let last_fun = List.fold_right last_fun vars res in
+  let fn_vars_to_tuple = List.fold_right last_fun vars vars_tuple in
   let gens = List.map (expr_of_typ quoter) tuple in
-  gens, last_fun
+  gens, fn_vars_to_tuple 
 
 (* TODO: major cargo culting here, I have no idea how this works *)
 let core_type_of_decl ~options ~path type_decl =
@@ -90,19 +90,12 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
                                    non-empty list *)
       let gens = labels |> List.map (fun {pld_type} -> expr_of_typ quoter pld_type) in
-      (* need to build the mapping function: fun a -> fun b -> ... -> fun z ->
-        { field1 = a; field2 = b; ...; fieldn = z; } *)
-      (* so here's our a, ... z *)
       let vars = n_vars (List.length labels) [] in
       let field_assignments = labels |> List.mapi (fun n {pld_name} ->
         let lid = Ast_convenience.lid pld_name.txt in
         (lid, Ast_helper.Exp.ident @@ Ast_convenience.lid @@ List.nth vars n))
       in
-      (* presumably lid is the name of the record field; how do I get that? *)
       let record = Ast_helper.Exp.record field_assignments None in
-      let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
-        (Ast_helper.Pat.var (Location.mknoloc arg))
-        function_body in
       let last_fun = List.fold_right last_fun vars record in
       [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
     | Ptype_variant constrs, _ ->
