@@ -4,6 +4,9 @@ type foo = A of int | B of float | C of int * float
 type quux = Q of int | B of foo
 [@@deriving crowbar]
 
+type ploomple = int * float
+[@@deriving crowbar]
+
 type bar = {
   justice: bool;
   purrs: int;
