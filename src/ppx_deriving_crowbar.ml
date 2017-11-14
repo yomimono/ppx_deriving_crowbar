@@ -7,6 +7,8 @@ open Ast_convenience
 let deriver = "crowbar"
 let raise_errorf = Ppx_deriving.raise_errorf
 
+let mangler = Ppx_deriving.(`Prefix "generate")
+
 (* currently we ignore all options *)
 
 let attr_nobuiltin attrs =
@@ -60,11 +62,11 @@ let rec expr_of_typ quoter typ =
     (* TODO: parametric types? *)
     (* TODO: mutually recursive types don't work, I'm pretty sure *)
     | _ ->
-    let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "generate") lid)))
-        (List.map expr_of_typ args)
-    in
+    let name = mknoloc (Ppx_deriving.mangle_lid mangler lid) in
+    let body = List.map expr_of_typ args in
+    let fwd = app (Exp.ident name) body in
     (* [%expr fun x -> [%e fwd] x]   (* ppx_deriving_yojson claims this is needed for "recursive groups" *) *)
-    [%expr unlazy [%e fwd]]
+    [%expr [%e fwd]]
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
     let gens, vars_to_tuple = generate_tuple quoter tuple in
@@ -110,6 +112,8 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
                                    non-empty list *)
       let gens = labels |> List.map (fun {pld_type} -> expr_of_typ quoter pld_type) in
+      let needs_lazifying = List.mem
+        [%expr (Ppx_deriving.mangle_type_decl mangler) type_decl] gens in
       let vars = n_vars (List.length labels) [] in
       let field_assignments = labels |> List.mapi (fun n {pld_name} ->
         let lid = Ast_convenience.lid pld_name.txt in
@@ -117,7 +121,8 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
       in
       let record = Ast_helper.Exp.record field_assignments None in
       let fn_vars_to_record = List.fold_right last_fun vars record in
-      lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
+      let expr = [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])] in
+      if needs_lazifying then lazify expr else expr
     | Ptype_variant constrs, _ ->
       let cases = constrs |> List.map (fun {pcd_name; pcd_res; pcd_args} ->
           (* under what circumstances can pcd_res be non-None and pcd_args be
@@ -141,15 +146,14 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~lazing:true ~options
       ~path type_decl in
-  let generate_var = pvar (Ppx_deriving.mangle_type_decl (`Prefix "generate")
-                              type_decl) in
+  let generate_var = pvar (Ppx_deriving.mangle_type_decl mangler type_decl) in
   (* the value binding for our generator *)
   [Vb.mk (Pat.constraint_ generate_var out_type)
      (Ppx_deriving.sanitize ~quoter (polymorphize generator));
   ]
 
 let unlazify type_decl =
-  let name = Ppx_deriving.mangle_type_decl (`Prefix "generate") type_decl in
+  let name = Ppx_deriving.mangle_type_decl mangler type_decl in
   let lazy_name = Ast_helper.Pat.lazy_ (Ast_helper.Pat.var (mknoloc name)) in
   let body = Exp.ident (Ast_convenience.lid name) in
   Str.value Nonrecursive [Vb.mk lazy_name body]
