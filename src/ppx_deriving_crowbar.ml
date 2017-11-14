@@ -12,6 +12,14 @@ let raise_errorf = Ppx_deriving.raise_errorf
 let attr_nobuiltin attrs =
   Ppx_deriving.(attrs |> attr ~deriver "nobuiltin" |> Arg.get_flag ~deriver)
 
+let make_crowbar_list l =
+  let consify add_me extant =
+      Ast_helper.Exp.(construct (Ast_convenience.lid "Crowbar.::")
+                        (Some (tuple [add_me; extant])))
+  in
+  List.fold_right consify l (Ast_helper.Exp.construct (Ast_convenience.lid
+                                                 "Crowbar.[]") None)
+
 let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
   let typ = Ppx_deriving.remove_pervasives ~deriver typ in
@@ -46,14 +54,6 @@ let core_type_of_decl ~options ~path type_decl =
     (fun var -> [%type: [%t var] Crowbar.gen])
     type_decl
     [%type: [%t typ] Crowbar.gen]
-
-let make_crowbar_list l =
-  let consify add_me extant =
-      Ast_helper.Exp.(construct (Ast_convenience.lid "Crowbar.::")
-                        (Some (tuple [add_me; extant])))
-  in
-  List.fold_right consify l (Ast_helper.Exp.construct (Ast_convenience.lid
-                                                 "Crowbar.[]") None)
 
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
