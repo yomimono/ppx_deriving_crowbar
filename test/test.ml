@@ -7,11 +7,11 @@ type quux = Q of int | B of foo
 type ploomple = int * float
 [@@deriving crowbar]
 
-(* type bar = {
+type bar = {
   justice: bool;
   purrs: int;
 }
-[@@deriving crowbar] *)
+[@@deriving crowbar]
 let () =
   Crowbar.(add_test ~name:"everything is awesome"
              [generate_foo] (fun foo -> check @@ match foo with
