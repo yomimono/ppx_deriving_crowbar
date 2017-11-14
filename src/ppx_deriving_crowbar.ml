@@ -23,6 +23,25 @@ let make_crowbar_list l =
 let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
   let typ = Ppx_deriving.remove_pervasives ~deriver typ in
+  let generate_tuple ~name tuple =
+    let rec n_vars n (l : string list) =
+      if n > 0 then n_vars (n-1) ((Ppx_deriving.fresh_var l)::l)
+      else List.rev l
+    in
+    let vars = n_vars (List.length tuple) [] in
+    (* make a tuple of those names *)
+    let desc = List.map
+        (fun i -> Ast_helper.Exp.mk @@
+          Pexp_ident (Ast_convenience.lid i)) vars
+    in
+    let res = Ast_helper.Exp.construct name (Some (Ast_convenience.tuple desc)) in
+    let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
+        (Ast_helper.Pat.var (Location.mknoloc arg))
+        function_body in
+    let last_fun = List.fold_right last_fun vars res in
+    let gens = List.map (expr_of_typ quoter) tuple in
+    gens, last_fun
+  in
   match typ with
   | { ptyp_desc = Ptyp_constr ({ txt = lid }, args) } ->                        
     begin
@@ -75,28 +94,10 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
              populated? *)
           match pcd_res, pcd_args with
           | None, Pcstr_tuple tuple ->
-            let rec n_vars n (l : string list) =
-              if n > 0 then
-                n_vars (n-1) ((Ppx_deriving.fresh_var l)::l)
-              else
-                List.rev l
-            in
-            let vars = n_vars (List.length tuple) [] in
-            (* make a tuple of those names *)
-            let desc = List.map
-                 (fun i -> Ast_helper.Exp.mk @@
-                   Pexp_ident (Ast_convenience.lid i)) vars
-            in
-            let res = Ast_helper.Exp.construct (Ast_convenience.lid pcd_name.txt)
-                (Some (Ast_convenience.tuple desc))
-            in
-            let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
-                (Ast_helper.Pat.var (Location.mknoloc arg))
-                function_body in
-            let last_fun = List.fold_right last_fun vars res in
-            let gens = List.map (expr_of_typ quoter) tuple in
             (* how do we get all of these gens into the right structure for
                Crowbar?  It just looks like a list, it isn't really one. *)
+            let (gens, last_fun) = generate_tuple
+              ~name:(Ast_convenience.lid pcd_name.txt) tuple in
             [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
