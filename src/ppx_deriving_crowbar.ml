@@ -96,8 +96,8 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
         (lid, Ast_helper.Exp.ident @@ Ast_convenience.lid @@ List.nth vars n))
       in
       let record = Ast_helper.Exp.record field_assignments None in
-      let last_fun = List.fold_right last_fun vars record in
-      [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
+      let fn_vars_to_record = List.fold_right last_fun vars record in
+      [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
     | Ptype_variant constrs, _ ->
       let cases = constrs |> List.map (fun {pcd_name; pcd_res; pcd_args} ->
           (* under what circumstances can pcd_res be non-None and pcd_args be
