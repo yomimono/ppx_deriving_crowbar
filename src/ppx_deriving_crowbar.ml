@@ -47,6 +47,14 @@ let rec expr_of_typ quoter typ =
     | [%type: char] -> [%expr (map [uint8] Char.chr)]
     | [%type: string]
     | [%type: String.t] -> [%expr bytes]
+    | [%type: bytes]
+    | [%type: Bytes.t] -> [%expr map [bytes] Bytes.of_string]
+    | [%type: nativeint]
+    | [%type: Nativeint.t] -> [%expr map [int] Nativeint.of_int]
+    (* TODO: polymorphic variants, ref, list, array, option,
+       lazy_t "and their Mod.t aliases" (e.g. Option.t I guess?), result *)
+    (* also TODO: do we DTRT for [@nobuiltin]? *)
+    (* TODO: parametric types? *)
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "generate") lid)))
         (List.map expr_of_typ args)                                         
