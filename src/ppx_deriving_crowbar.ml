@@ -44,13 +44,13 @@ let rec expr_of_typ quoter typ =
         (List.map expr_of_typ args)                                         
     in                                                                          
     [%expr [%e fwd]]   
-    end (* 
+    end
   | { ptyp_desc = Ptyp_tuple tuple } ->
-    let gens, last_fun = generate_tuple ~name:(Ast_convenience.lid "any_free_var") tuple in
-    [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])] *)
+    let gens, last_fun = generate_tuple quoter tuple in
+    [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
-and generate_tuple quoter ~name tuple =
+and generate_tuple quoter ?name tuple =
   let rec n_vars n (l : string list) =
     if n > 0 then n_vars (n-1) ((Ppx_deriving.fresh_var l)::l)
     else List.rev l
@@ -59,9 +59,12 @@ and generate_tuple quoter ~name tuple =
   (* make a tuple of those names *)
   let desc = List.map
       (fun i -> Ast_helper.Exp.mk @@
-        Pexp_ident (Ast_convenience.lid i)) vars
+        Pexp_ident (Ast_convenience.lid i)) vars |> Ast_convenience.tuple
   in
-  let res = Ast_helper.Exp.construct name (Some (Ast_convenience.tuple desc)) in
+  let res = match name with
+  | Some name -> Ast_helper.Exp.construct name (Some desc)
+  | None -> desc
+  in
   let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
       (Ast_helper.Pat.var (Location.mknoloc arg))
       function_body in
