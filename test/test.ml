@@ -14,16 +14,6 @@ type bar = {
   rejweo: quux;
 }
 [@@deriving crowbar]
-
-type crimplo =
-  | Frep of bar
-  | Jlam of ploomple
-[@@deriving crowbar]
-
-type tlamye =
-  [`Corning | `Mlaqre]
-[@@deriving crowbar]
-
 let () =
   Crowbar.(add_test ~name:"everything is awesome"
              [generate_foo] (fun foo -> check @@ match foo with
