@@ -173,7 +173,12 @@ let tag_recursive_for_unlazifying type_decls =
      let constrs = constrs |> List.map @@ fun constr ->
        match constr.pcd_res with
        | Some core_type -> {constr with pcd_res = Some (tag_on_match needle core_type)}
-       | None -> (* TODO: more descent *) constr
+       | None -> match pcd_args with
+         | Pcstr_tuple tuple -> { constr with pcd_args = Pcstr_tuple (List.map (tag_on_match needle) tuple) }
+         | Pcstr_record labels ->
+           let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
+           { constr with pcd_args = Pcstr_record (List.map check labels) }
+ (* TODO: more descent *) constr
      in
      {type_decl with ptype_kind = (Ptype_variant constrs)}
   in
