@@ -78,6 +78,8 @@ let rec expr_of_typ quoter typ =
     lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
+(* TODO: this name pattern is common with the records handler for variants,
+  but their naming/arg handling is different; unify them one way or the other *)
 and generate_tuple quoter ?name tuple =
   let vars = n_vars (List.length tuple) [] in
   let vars_tuple = List.map Ast_convenience.evar vars |> Ast_convenience.tuple in
@@ -107,20 +109,28 @@ let core_type_of_decl ?(lazing=false) ~options ~path type_decl =
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
   let path = Ppx_deriving.path_of_type_decl ~path type_decl in
+  let gens_and_fn_of_labels ?name labels =
+    let gens = labels |> List.map (fun {pld_type} -> expr_of_typ quoter pld_type) in
+    let vars = n_vars (List.length labels) [] in
+    let field_assignments = labels |> List.mapi (fun n {pld_name} ->
+      let lid = Ast_convenience.lid pld_name.txt in
+      (lid, Ast_helper.Exp.ident @@ Ast_convenience.lid @@ List.nth vars n))
+    in
+    let record = Ast_helper.Exp.record field_assignments None in
+    let record = match name with
+    | None -> record
+    | Some name -> Ast_helper.Exp.construct name (Some record)
+    in
+    let fn_vars_to_record = List.fold_right last_fun vars record in
+    (gens, fn_vars_to_record)
+  in
   let generator =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
                                    non-empty list *)
-      let gens = labels |> List.map (fun {pld_type} -> expr_of_typ quoter pld_type) in
-      let vars = n_vars (List.length labels) [] in
-      let field_assignments = labels |> List.mapi (fun n {pld_name} ->
-        let lid = Ast_convenience.lid pld_name.txt in
-        (lid, Ast_helper.Exp.ident @@ Ast_convenience.lid @@ List.nth vars n))
-      in
-      let record = Ast_helper.Exp.record field_assignments None in
-      let fn_vars_to_record = List.fold_right last_fun vars record in
+      let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
       lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
     | Ptype_variant constrs, _ ->
       let cases = constrs |> List.map (fun {pcd_name; pcd_res; pcd_args} ->
@@ -133,10 +143,12 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
-            expr_of_typ quoter core_type (*
+            expr_of_typ quoter core_type
           | None, Pcstr_record labels ->
-            (* C of {...} or C of {...} as t *) *)
-
+            (* C of {...} or C of {...} as t *)
+            let gens, fn_vars_to_record = gens_and_fn_of_labels
+              ~name:(Ast_convenience.lid pcd_name.txt) labels in
+            [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
         ) in
       (* we must be sure that there are generators for all of the possible
          variant types, and then invoke Crowbar.choose on the list of them. *)
@@ -184,7 +196,7 @@ let tag_recursive_for_unlazifying type_decls =
            { constr with pcd_args = Pcstr_record (List.map check labels)}
      in
      {type_decl with ptype_kind = (Ptype_variant constrs)}
-   | Ptype_open _, _ -> type_decl (* TODO: I don't know what else we could do here *)
+   | Ptype_open, _ -> type_decl (* TODO: I don't know what else we could do here *)
   in
   (* each top-level element in the list has to be fully considered with respect
      to both itself and other items *)

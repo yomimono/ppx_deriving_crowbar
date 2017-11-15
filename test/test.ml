@@ -13,6 +13,9 @@ type bar = {
 }
 [@@deriving crowbar]
 
+type clippy = | A of int | B of {a: int; b: float}
+[@@deriving crowbar]
+
 let () =
   Crowbar.(add_test ~name:"everything is awesome"
              [generate_foo; generate_bar; generate_quux] (fun foo _bar _quux -> check @@ match foo with
