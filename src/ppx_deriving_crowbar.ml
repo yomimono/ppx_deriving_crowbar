@@ -161,10 +161,11 @@ let tag_recursive_for_unlazifying (type_decls : type_declaration list)  : type_d
     let new_tag : Parsetree.attribute = loc, payload in
     Ast_helper.Typ.attr core_type new_tag
   in
-  let tag_on_match needle core_type =
-    match core_type with
-    | [%type: needle] -> add_tag core_type
-    | _ -> core_type
+  let tag_on_match (needle : type_declaration) core_type =
+    (* TODO: there is certainly a better way to do this comparison *)
+    if (0 = String.compare (Ppx_deriving.string_of_core_type core_type) needle.ptype_name.txt)
+    then add_tag core_type
+    else core_type
   in
   let rec descender needle type_decl =
    match type_decl.ptype_kind, type_decl.ptype_manifest with
