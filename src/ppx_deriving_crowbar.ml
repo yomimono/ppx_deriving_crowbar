@@ -70,8 +70,6 @@ let rec expr_of_typ quoter typ =
     in
     let matches (loc, _) = (0 = String.compare loc.txt unlazify_attribute_name) in
     match List.exists matches typ.ptyp_attributes with
-    (* pull the string out of the string loc in the first item of the attribute tuple and compare it to the "unique" string we set up initially; if it matches, stick in an `unlazy` *)
-    (* [%expr fun x -> [%e fwd] x]   (* ppx_deriving_yojson claims this is needed for "recursive groups" *) *)
     | true -> [%expr unlazy [%e fwd]]
     | false -> [%expr [%e fwd]]
     end
