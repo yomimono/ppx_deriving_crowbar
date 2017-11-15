@@ -68,8 +68,12 @@ let rec expr_of_typ quoter typ =
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)
     in
+    let matches (loc, _) = (0 = String.compare loc.txt unlazify_attribute_name) in
+    match List.exists matches typ.ptyp_attributes with
+    (* pull the string out of the string loc in the first item of the attribute tuple and compare it to the "unique" string we set up initially; if it matches, stick in an `unlazy` *)
     (* [%expr fun x -> [%e fwd] x]   (* ppx_deriving_yojson claims this is needed for "recursive groups" *) *)
-    [%expr unlazy [%e fwd]]
+    | true -> [%expr unlazy [%e fwd]]
+    | false -> [%expr [%e fwd]]
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
     let gens, vars_to_tuple = generate_tuple quoter tuple in
@@ -149,11 +153,11 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
      (Ppx_deriving.sanitize ~quoter (polymorphize generator));
   ]
 
-let tag_recursive_for_unlazifying type_decls =
+let tag_recursive_for_unlazifying (type_decls : type_declaration list)  : type_declaration list =
   let add_tag core_type =
     let loc = Location.mknoloc unlazify_attribute_name in
     let payload : Parsetree.payload =
-       (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr ""], []))]) in
+       (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr "unlazy"], []))]) in
     let new_tag : Parsetree.attribute = loc, payload in
     Ast_helper.Typ.attr core_type new_tag
   in
@@ -183,7 +187,7 @@ let tag_recursive_for_unlazifying type_decls =
   in
   (* each top-level element in the list has to be fully considered with respect
      to both itself and other items *)
-  List.map (fun type_decl -> List.map (descender type_decl) type_decls) type_decls
+  List.fold_left (fun l needle -> List.map (descender needle) l) type_decls type_decls
 
 let unlazify type_decl =
   let name = Ppx_deriving.mangle_type_decl mangler type_decl in
@@ -194,6 +198,7 @@ let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter (fun quoter typ -> expr_of_typ quoter
                                              typ))
     ~type_decl_str:(fun ~options ~path type_decls ->
+        let type_decls = tag_recursive_for_unlazifying type_decls in
         let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
         (Str.value Recursive bodies) ::
         (List.map unlazify type_decls))

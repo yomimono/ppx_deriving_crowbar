@@ -5,6 +5,7 @@ and quux = Q of int | R of foo
 type ploomple = int * float
 [@@deriving crowbar]
 
+(* 
 type bar = {
   justice: bool;
   purrs: int;
@@ -18,4 +19,4 @@ let () =
       | A i -> Printf.printf "an int: %d\n%!" i; true
       | B f -> Printf.printf "a float: %f\n%!" f; true
       | C _ -> (Printf.printf "OMG, something exotic!\n%!"); true)
-          )
+          ) *)
