@@ -126,8 +126,13 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   in
   let generator =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
+    | Ptype_open, _ -> raise_errorf "%s cannot be derived for open type" deriver (* TODO: can we do better? *)
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
+    | Ptype_abstract, None ->
+      (* we have a ptype_name, so we can try for a generate_foo in the namespace *)
+      let name = app (Exp.ident (Ast_convenience.lid (Ppx_deriving.mangle_type_decl mangler type_decl))) [] in
+      [%expr [%e name]]
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
                                    non-empty list *)
       let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
