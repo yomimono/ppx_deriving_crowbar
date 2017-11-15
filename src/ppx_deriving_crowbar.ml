@@ -64,6 +64,10 @@ let rec expr_of_typ quoter typ =
        lazy_t "and their Mod.t aliases" (e.g. Option.t I guess?), result *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
     (* TODO: parametric types? *)
+    | [%type: [%t? typ] option] ->
+      [%expr map [bool; [%e expr_of_typ typ]] (fun a b -> if a then Some b else None)]
+    | [%type: [%t? typ] ref] ->
+      [%expr map [[%e expr_of_typ typ]] (fun a -> ref a)]
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)

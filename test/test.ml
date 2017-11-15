@@ -2,7 +2,7 @@ type foo = A of int | B of float | C of quux
 and quux = Q of int | R of foo
 [@@deriving crowbar]
 
-type ploomple = int * float
+type ploomple = int option * float * bool ref
 [@@deriving crowbar]
 
 type bar = {
