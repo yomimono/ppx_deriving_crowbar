@@ -9,6 +9,8 @@ let raise_errorf = Ppx_deriving.raise_errorf
 
 (* currently we ignore all options *)
 
+let mangler = Ppx_deriving.(`Prefix "generate")
+
 let attr_nobuiltin attrs =
   Ppx_deriving.(attrs |> attr ~deriver "nobuiltin" |> Arg.get_flag ~deriver)
 
@@ -60,7 +62,7 @@ let rec expr_of_typ quoter typ =
     (* TODO: parametric types? *)
     (* TODO: mutually recursive types don't work, I'm pretty sure *)
     | _ ->
-    let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "generate") lid)))
+    let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)
     in
     (* [%expr fun x -> [%e fwd] x]   (* ppx_deriving_yojson claims this is needed for "recursive groups" *) *)
@@ -141,15 +143,14 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~lazing:true ~options
       ~path type_decl in
-  let generate_var = pvar (Ppx_deriving.mangle_type_decl (`Prefix "generate")
-                              type_decl) in
+  let generate_var = pvar (Ppx_deriving.mangle_type_decl mangler type_decl) in
   (* the value binding for our generator *)
   [Vb.mk (Pat.constraint_ generate_var out_type)
      (Ppx_deriving.sanitize ~quoter (polymorphize generator));
   ]
 
 let unlazify type_decl =
-  let name = Ppx_deriving.mangle_type_decl (`Prefix "generate") type_decl in
+  let name = Ppx_deriving.mangle_type_decl mangler type_decl in
   let lazy_name = Ast_helper.Pat.lazy_ (Ast_helper.Pat.var (mknoloc name)) in
   let body = Exp.ident (Ast_convenience.lid name) in
   Str.value Nonrecursive [Vb.mk lazy_name body]
@@ -158,8 +159,8 @@ let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter (fun quoter typ -> expr_of_typ quoter
                                              typ))
     ~type_decl_str:(fun ~options ~path type_decls ->
-        (Str.value Recursive (List.concat (List.map (str_of_type ~options ~path)
-                                type_decls))) ::
+        let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
+        (Str.value Recursive bodies) ::
         (List.map unlazify type_decls))
     ()
 
