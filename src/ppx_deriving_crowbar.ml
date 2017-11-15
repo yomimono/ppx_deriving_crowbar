@@ -10,6 +10,10 @@ let raise_errorf = Ppx_deriving.raise_errorf
 (* currently we ignore all options *)
 
 let mangler = Ppx_deriving.(`Prefix "generate")
+  (* TODO: should be to_crowbar or to_crowbar_gen or some such, probably;
+     reread name rules *)
+let unlazify_attribute_name = "crowbar_recursive_typedef_please_unlazy"
+  (* TODO: actually make sure this is unique *)
 
 let attr_nobuiltin attrs =
   Ppx_deriving.(attrs |> attr ~deriver "nobuiltin" |> Arg.get_flag ~deriver)
@@ -60,7 +64,6 @@ let rec expr_of_typ quoter typ =
        lazy_t "and their Mod.t aliases" (e.g. Option.t I guess?), result *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
     (* TODO: parametric types? *)
-    (* TODO: mutually recursive types don't work, I'm pretty sure *)
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)
@@ -75,10 +78,7 @@ let rec expr_of_typ quoter typ =
                       deriver (Ppx_deriving.string_of_core_type typ)
 and generate_tuple quoter ?name tuple =
   let vars = n_vars (List.length tuple) [] in
-  let vars_tuple = List.map
-      (fun i -> Ast_helper.Exp.mk @@
-        Pexp_ident (Ast_convenience.lid i)) vars |> Ast_convenience.tuple
-  in
+  let vars_tuple = List.map Ast_convenience.evar vars |> Ast_convenience.tuple in
   let vars_tuple = match name with
   | Some name -> Ast_helper.Exp.construct name (Some vars_tuple)
   | None -> vars_tuple
@@ -149,11 +149,42 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
      (Ppx_deriving.sanitize ~quoter (polymorphize generator));
   ]
 
+let tag_recursive_for_unlazifying type_decls =
+  let add_tag core_type =
+    let loc = Location.mknoloc unlazify_attribute_name in
+    let payload : Parsetree.payload =
+       (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr ""], []))]) in
+    let new_tag : Parsetree.attribute = loc, payload in
+    Ast_helper.Typ.attr core_type new_tag
+  in
+  let tag_on_match needle core_type =
+    match core_type with
+    | [%type: needle] -> add_tag core_type
+    | _ -> core_type
+  in
+  let rec descender needle type_decl =
+   match type_decl.ptype_kind, type_decl.ptype_manifest with
+   | Ptype_abstract, Some manifest -> {type_decl with ptype_manifest = Some (tag_on_match needle manifest) }
+   | Ptype_record labels, _ ->
+     let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
+     let labels = List.map check labels in
+     {type_decl with ptype_kind = (Ptype_record labels)}
+   | Ptype_variant constrs, _ ->
+     let constrs = constrs |> List.map @@ fun constr ->
+       match constr.pcd_res with
+       | Some core_type -> {constr with pcd_res = Some (tag_on_match needle core_type)}
+       | None -> (* TODO: more descent *) constr
+     in
+     {type_decl with ptype_kind = (Ptype_variant constrs)}
+  in
+  (* each top-level element in the list has to be fully considered with respect
+     to both itself and other items *)
+  type_decls (* TODO: nope *)
+
 let unlazify type_decl =
   let name = Ppx_deriving.mangle_type_decl mangler type_decl in
   let lazy_name = Ast_helper.Pat.lazy_ (Ast_helper.Pat.var (mknoloc name)) in
-  let body = Exp.ident (Ast_convenience.lid name) in
-  Str.value Nonrecursive [Vb.mk lazy_name body]
+  Str.value Nonrecursive [Vb.mk lazy_name (Ast_convenience.evar name)]
 
 let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter (fun quoter typ -> expr_of_typ quoter
