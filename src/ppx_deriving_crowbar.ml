@@ -144,11 +144,11 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
          variant types, and then invoke Crowbar.choose on the list of them. *)
       lazify @@ [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   in
+  (* TODO: this is intensely cargo-culted, figure out what's actually needed *)
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~lazing:true ~options
       ~path type_decl in
   let generate_var = pvar (Ppx_deriving.mangle_type_decl mangler type_decl) in
-  (* the value binding for our generator *)
   [Vb.mk (Pat.constraint_ generate_var out_type)
      (Ppx_deriving.sanitize ~quoter (polymorphize generator));
   ]
@@ -170,6 +170,7 @@ let tag_recursive_for_unlazifying type_decls =
   let rec descender needle type_decl =
    match type_decl.ptype_kind, type_decl.ptype_manifest with
    | Ptype_abstract, Some manifest -> {type_decl with ptype_manifest = Some (tag_on_match needle manifest) }
+   | Ptype_abstract, None -> type_decl
    | Ptype_record labels, _ ->
      let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
      let labels = List.map check labels in
@@ -185,6 +186,7 @@ let tag_recursive_for_unlazifying type_decls =
            { constr with pcd_args = Pcstr_record (List.map check labels)}
      in
      {type_decl with ptype_kind = (Ptype_variant constrs)}
+   | Ptype_open _, _ -> type_decl (* TODO: I don't know what else we could do here *)
   in
   (* each top-level element in the list has to be fully considered with respect
      to both itself and other items *)
