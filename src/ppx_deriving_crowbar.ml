@@ -70,7 +70,7 @@ let rec expr_of_typ quoter typ =
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
     let gens, vars_to_tuple = generate_tuple quoter tuple in
-    [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
+    lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
 and generate_tuple quoter ?name tuple =
