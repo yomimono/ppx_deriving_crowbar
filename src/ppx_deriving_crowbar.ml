@@ -153,7 +153,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
      (Ppx_deriving.sanitize ~quoter (polymorphize generator));
   ]
 
-let tag_recursive_for_unlazifying (type_decls : type_declaration list)  : type_declaration list =
+let tag_recursive_for_unlazifying type_decls =
   let add_tag core_type =
     let loc = Location.mknoloc unlazify_attribute_name in
     let payload : Parsetree.payload =
