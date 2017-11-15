@@ -1,14 +1,14 @@
 type foo = A of int | B of float | C of quux
 and quux = Q of int | R of foo
 [@@deriving crowbar]
-(* 
+
 type ploomple = int * float
 [@@deriving crowbar]
-*)
+
 type bar = {
   justice: bool;
   purrs: int;
-  fangs: foo;
+  fangs: ploomple;
   rejweo: quux;
 }
 [@@deriving crowbar]
