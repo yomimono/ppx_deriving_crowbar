@@ -1,5 +1,5 @@
 type foo = A of int | B of float | C of quux
-and quux = Q of int | R of foo
+and quux = Q of int | R of foo | D of foo list
 [@@deriving crowbar]
 
 type ploomple = int option * float * bool ref

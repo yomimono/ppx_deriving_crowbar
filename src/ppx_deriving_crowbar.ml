@@ -60,7 +60,7 @@ let rec expr_of_typ quoter typ =
     | [%type: Bytes.t] -> [%expr map [bytes] Bytes.of_string]
     | [%type: nativeint]
     | [%type: Nativeint.t] -> [%expr map [int] Nativeint.of_int]
-    (* TODO: polymorphic variants, ref, list, array, option,
+    (* TODO: polymorphic variants, list, array,
        lazy_t "and their Mod.t aliases" (e.g. Option.t I guess?), result *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
     (* TODO: parametric types? *)
@@ -68,6 +68,8 @@ let rec expr_of_typ quoter typ =
       [%expr map [bool; [%e expr_of_typ typ]] (fun a b -> if a then Some b else None)]
     | [%type: [%t? typ] ref] ->
       [%expr map [[%e expr_of_typ typ]] (fun a -> ref a)]
+    | [%type: [%t? typ] list] ->
+      [%expr list [%e expr_of_typ typ]]
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)
@@ -180,8 +182,14 @@ let tag_recursive_for_unlazifying type_decls =
     let new_tag : Parsetree.attribute = loc, payload in
     Ast_helper.Typ.attr core_type new_tag
   in
-  let tag_on_match (needle : type_declaration) core_type =
+  let rec tag_on_match (needle : type_declaration) core_type =
     (* TODO: there is certainly a better way to do this comparison *)
+    (* need to also tag any arguments; how do I find them? *)
+    let core_type = match core_type.ptyp_desc with
+    | Ptyp_constr (name, args) -> {core_type with ptyp_desc =
+                        Ptyp_constr (name, List.map (tag_on_match needle) args)}
+    | _ -> core_type
+    in
     if (0 = String.compare (Ppx_deriving.string_of_core_type core_type) needle.ptype_name.txt)
     then add_tag core_type
     else core_type
