@@ -14,6 +14,9 @@ type bar = {
 }
 [@@deriving crowbar]
 
+type oh_no = (int, string) result
+[@@deriving crowbar]
+
 type clippy = | A of int | B of {a: int; b: float}
 [@@deriving crowbar]
 

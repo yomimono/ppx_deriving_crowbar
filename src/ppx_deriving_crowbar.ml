@@ -74,6 +74,16 @@ let rec expr_of_typ quoter typ =
     | [%type: [%t? typ] lazy_t]
     | [%type: [%t? typ] Lazy.t] ->
       [%expr map [[%e expr_of_typ typ]] (fun a -> lazy a)]
+    | [%type: ([%t? ok_t], [%t? err_t]) result]
+    | [%type: ([%t? ok_t], [%t? err_t]) Result.result] ->
+      [%expr
+        lazy Crowbar.(map [bool; [%e expr_of_typ ok_t]; [%e expr_of_typ err_t]]
+             (fun b x y ->
+               if b then (Result.Ok x)
+               else (Result.Error y)
+             ))
+      ]
+
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)
