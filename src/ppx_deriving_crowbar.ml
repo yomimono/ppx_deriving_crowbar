@@ -60,8 +60,8 @@ let rec expr_of_typ quoter typ =
     | [%type: Bytes.t] -> [%expr map [bytes] Bytes.of_string]
     | [%type: nativeint]
     | [%type: Nativeint.t] -> [%expr map [int] Nativeint.of_int]
-    (* TODO: polymorphic variants, list, array,
-       lazy_t "and their Mod.t aliases" (e.g. Option.t I guess?), result *)
+    (* TODO: polymorphic variants,
+       lazy_t "and their Mod.t aliases", result *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
     (* TODO: parametric types? *)
     | [%type: [%t? typ] option] ->
@@ -72,6 +72,9 @@ let rec expr_of_typ quoter typ =
       [%expr list [%e expr_of_typ typ]]
     | [%type: [%t? typ] array] ->
       [%expr map [list [%e expr_of_typ typ]] Array.of_list]
+    | [%type: [%t? typ] lazy_t]
+    | [%type: [%t? typ] Lazy.t] ->
+      [%expr map [[%e expr_of_typ typ]] (fun a -> lazy a)]
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)
@@ -86,8 +89,6 @@ let rec expr_of_typ quoter typ =
     lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
-(* TODO: this name pattern is common with the records handler for variants,
-  but their naming/arg handling is different; unify them one way or the other *)
 and generate_tuple quoter ?name tuple =
   let vars = n_vars (List.length tuple) [] in
   let vars_tuple = List.map Ast_convenience.evar vars |> Ast_convenience.tuple in
@@ -100,19 +101,12 @@ and generate_tuple quoter ?name tuple =
   gens, fn_vars_to_tuple
 
 (* TODO: major cargo culting here, I have no idea how this works *)
-let core_type_of_decl ?(lazing=false) ~options ~path type_decl =
+let core_type_of_decl ~options ~path type_decl =
   let typ = Ppx_deriving.core_type_of_type_decl type_decl in
-  match lazing with
-  | true ->
   Ppx_deriving.poly_arrow_of_type_decl
     (fun var -> [%type: [%t var] Crowbar.gen Lazy.t])
     type_decl
     [%type: [%t typ] Crowbar.gen Lazy.t]
-  | false ->
-  Ppx_deriving.poly_arrow_of_type_decl
-    (fun var -> [%type: [%t var] Crowbar.gen])
-    type_decl
-    [%type: [%t typ] Crowbar.gen]
 
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
@@ -169,7 +163,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   in
   (* TODO: this is intensely cargo-culted, figure out what's actually needed *)
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
-  let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~lazing:true ~options
+  let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
       ~path type_decl in
   let generate_var = pvar (Ppx_deriving.mangle_type_decl mangler type_decl) in
   [Vb.mk (Pat.constraint_ generate_var out_type)

@@ -9,6 +9,7 @@ type bar = {
   justice: bool;
   purrs: int array;
   fangs: ploomple;
+  clorntro: string Lazy.t;
   rejweo: quux;
 }
 [@@deriving crowbar]
