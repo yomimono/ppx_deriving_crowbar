@@ -227,8 +227,23 @@ let tag_recursive_for_unlazifying type_decls =
 
 let unlazify type_decl =
   let name = Ppx_deriving.mangle_type_decl mangler type_decl in
-  let lazy_name = Ast_helper.Pat.lazy_ (Ast_helper.Pat.var (mknoloc name)) in
-  Str.value Nonrecursive [Vb.mk lazy_name (Ast_convenience.evar name)]
+  let fn_name_ident = Exp.ident (Ast_convenience.lid name) in
+  let args = Ppx_deriving.fold_right_type_decl
+      (fun str args -> (Asttypes.Nolabel, Exp.ident (Ast_convenience.lid
+                                                       ("poly_"^str)))::args)
+      type_decl []
+  in
+  match args with
+  | [] ->
+    let lazy_name = Ast_helper.Pat.lazy_ (Ast_helper.Pat.var (mknoloc name)) in
+    Str.value Nonrecursive [Vb.mk lazy_name (Ast_convenience.evar name)]
+  | args ->
+    let apply_fn = Exp.apply fn_name_ident args in
+    (* TODO: we assume Lazy has not been shadowed :/ *)
+    let lazy_fn = Exp.apply (Exp.ident (Ast_convenience.lid "Lazy.force"))
+      [Asttypes.Nolabel, apply_fn] in
+    let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
+    Str.value Nonrecursive [Vb.mk (pvar name) (polymorphize lazy_fn)]
 
 let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter (fun quoter typ -> expr_of_typ quoter
