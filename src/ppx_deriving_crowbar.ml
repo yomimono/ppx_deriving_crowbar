@@ -60,9 +60,8 @@ let rec expr_of_typ quoter typ =
     | [%type: Bytes.t] -> [%expr map [bytes] Bytes.of_string]
     | [%type: nativeint]
     | [%type: Nativeint.t] -> [%expr map [int] Nativeint.of_int]
-    (* TODO: polymorphic variants, result, general parameterized types *)
+    (* TODO: polymorphic variants, general parameterized types *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
-    (* TODO: parametric types? *)
     | [%type: [%t? typ] option] ->
       [%expr map [bool; [%e expr_of_typ typ]] (fun a b -> if a then Some b else None)]
     | [%type: [%t? typ] ref] ->
