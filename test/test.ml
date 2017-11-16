@@ -1,3 +1,6 @@
+type snorp = int
+[@@deriving crowbar]
+
 type foo = A of int | B of float | C of quux
 and quux = Q of int | R of foo | D of foo list
 [@@deriving crowbar]
@@ -14,10 +17,19 @@ type bar = {
 }
 [@@deriving crowbar]
 
-type oh_no = (int, string) result
+type clippy = | A of int | B of {a: int; b: float}
 [@@deriving crowbar]
 
-type clippy = | A of int | B of {a: int; b: float}
+type oops = (int, string) result
+[@@deriving crowbar]
+
+type disaster = | A of (int, string) result
+[@@deriving crowbar]
+
+type oh_no = ((int * float), string) result
+[@@deriving crowbar]
+
+type hlifd = {b: (int, string) result; }
 [@@deriving crowbar]
 
 let () =

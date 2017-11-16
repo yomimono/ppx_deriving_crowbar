@@ -45,38 +45,38 @@ let rec expr_of_typ quoter typ =
   | { ptyp_desc = Ptyp_constr ({ txt = lid }, args) } ->
     begin
       match typ with
-    | [%type: unit] -> [%expr const ()]
-    | [%type: int] -> [%expr int]
+    | [%type: unit] -> [%expr Crowbar.const ()]
+    | [%type: int] -> [%expr Crowbar.int]
     | [%type: int32]
-    | [%type: Int32.t] -> [%expr int32]
+    | [%type: Int32.t] -> [%expr Crowbar.int32]
     | [%type: int64]
-    | [%type: Int64.t] -> [%expr int64]
-    | [%type: float] -> [%expr float]
-    | [%type: bool] -> [%expr bool]
-    | [%type: char] -> [%expr (map [uint8] Char.chr)]
+    | [%type: Int64.t] -> [%expr Crowbar.int64]
+    | [%type: float] -> [%expr Crowbar.float]
+    | [%type: bool] -> [%expr Crowbar.bool]
+    | [%type: char] -> [%expr Crowbar.(map [uint8] Char.chr)]
     | [%type: string]
-    | [%type: String.t] -> [%expr bytes]
+    | [%type: String.t] -> [%expr Crowbar.bytes]
     | [%type: bytes]
-    | [%type: Bytes.t] -> [%expr map [bytes] Bytes.of_string]
+    | [%type: Bytes.t] -> [%expr Crowbar.(map [bytes] Bytes.of_string)]
     | [%type: nativeint]
-    | [%type: Nativeint.t] -> [%expr map [int] Nativeint.of_int]
+    | [%type: Nativeint.t] -> [%expr Crowbar.(map [int] Nativeint.of_int)]
     (* TODO: polymorphic variants, general parameterized types *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
     | [%type: [%t? typ] option] ->
-      [%expr map [bool; [%e expr_of_typ typ]] (fun a b -> if a then Some b else None)]
+      [%expr Crowbar.(map [bool; [%e expr_of_typ typ]]
+                        (fun a b -> if a then Some b else None))]
     | [%type: [%t? typ] ref] ->
-      [%expr map [[%e expr_of_typ typ]] (fun a -> ref a)]
+      [%expr Crowbar.(map [[%e expr_of_typ typ]] (fun a -> ref a))]
     | [%type: [%t? typ] list] ->
-      [%expr list [%e expr_of_typ typ]]
+      [%expr Crowbar.(list [%e expr_of_typ typ])]
     | [%type: [%t? typ] array] ->
-      [%expr map [list [%e expr_of_typ typ]] Array.of_list]
+      [%expr Crowbar.(map [list [%e expr_of_typ typ]] Array.of_list)]
     | [%type: [%t? typ] lazy_t]
     | [%type: [%t? typ] Lazy.t] ->
-      [%expr map [[%e expr_of_typ typ]] (fun a -> lazy a)]
+      [%expr Crowbar.(map [[%e expr_of_typ typ]] (fun a -> lazy a))]
     | [%type: ([%t? ok_t], [%t? err_t]) result]
     | [%type: ([%t? ok_t], [%t? err_t]) Result.result] ->
-      [%expr
-        lazy Crowbar.(map [bool; [%e expr_of_typ ok_t]; [%e expr_of_typ err_t]]
+      [%expr Crowbar.(map [bool; [%e expr_of_typ ok_t]; [%e expr_of_typ err_t]]
              (fun b x y ->
                if b then (Result.Ok x)
                else (Result.Error y)
@@ -94,7 +94,7 @@ let rec expr_of_typ quoter typ =
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
     let gens, vars_to_tuple = generate_tuple quoter tuple in
-    lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
+    [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
 and generate_tuple quoter ?name tuple =
@@ -146,7 +146,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
                                    non-empty list *)
       let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
-      lazify @@ [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
+      [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
     | Ptype_variant constrs, _ ->
       let cases = constrs |> List.map (fun {pcd_name; pcd_res; pcd_args} ->
           (* under what circumstances can pcd_res be non-None and pcd_args be
@@ -167,7 +167,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
         ) in
       (* we must be sure that there are generators for all of the possible
          variant types, and then invoke Crowbar.choose on the list of them. *)
-      lazify @@ [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
+      [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   in
   (* TODO: this is intensely cargo-culted, figure out what's actually needed *)
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
@@ -175,7 +175,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
       ~path type_decl in
   let generate_var = pvar (Ppx_deriving.mangle_type_decl mangler type_decl) in
   [Vb.mk (Pat.constraint_ generate_var out_type)
-     (Ppx_deriving.sanitize ~quoter (polymorphize generator));
+     (Ppx_deriving.sanitize ~quoter (polymorphize (lazify generator)));
   ]
 
 let tag_recursive_for_unlazifying type_decls =
