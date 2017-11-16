@@ -70,6 +70,8 @@ let rec expr_of_typ quoter typ =
       [%expr map [[%e expr_of_typ typ]] (fun a -> ref a)]
     | [%type: [%t? typ] list] ->
       [%expr list [%e expr_of_typ typ]]
+    | [%type: [%t? typ] array] ->
+      [%expr map [list [%e expr_of_typ typ]] Array.of_list]
     | _ ->
     let fwd = app (Exp.ident (mknoloc (Ppx_deriving.mangle_lid mangler lid)))
         (List.map expr_of_typ args)

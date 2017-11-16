@@ -7,7 +7,7 @@ type ploomple = int option * float * bool ref
 
 type bar = {
   justice: bool;
-  purrs: int;
+  purrs: int array;
   fangs: ploomple;
   rejweo: quux;
 }
