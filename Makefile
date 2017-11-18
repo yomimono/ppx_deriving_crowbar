@@ -2,6 +2,13 @@ build:
 	cp pkg/META.in pkg/META
 	ocaml pkg/build.ml native=true native-dynlink=true
 
+test:
+	rm -f test/*.cm* test/*.o
+	ocamlfind ocamlopt -ppx '`ocamlfind query ppx_deriving`/ppx_deriving _build/src/ppx_deriving_crowbar.cma' -package crowbar -package ppx_deriving -dsource -c test/test.ml
+parsetree:
+	rm -f test/*.cm* test/*.o
+	ocamlfind ocamlopt -ppx '`ocamlfind query ppx_deriving`/ppx_deriving _build/src/ppx_deriving_crowbar.cma' -package crowbar -package ppx_deriving -package compiler-libs -dsource -c test/parsetree.ml
+
 clean:
 	ocamlbuild -clean
 

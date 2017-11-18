@@ -193,7 +193,10 @@ let tag_recursive_for_unlazifying type_decls =
     (* need to also tag any arguments; how do I find them? *)
     let core_type = match core_type.ptyp_desc with
     | Ptyp_constr (name, args) -> {core_type with ptyp_desc =
-                        Ptyp_constr (name, List.map (tag_on_match needle) args)}
+                                                    Ptyp_constr (name, List.map (tag_on_match needle) args)}
+    | Ptyp_tuple l -> {core_type with ptyp_desc = Ptyp_tuple (List.map
+                                                                (tag_on_match
+                                                                   needle) l)}
     | _ -> core_type
     in
     if (0 = String.compare (Ppx_deriving.string_of_core_type core_type) needle.ptype_name.txt)

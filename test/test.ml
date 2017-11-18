@@ -8,6 +8,16 @@ and quux = Q of int | R of foo | D of foo list
 type ploomple = int option * float * bool ref
 [@@deriving crowbar]
 
+type fkeen = | A of int
+and meep = | B of fkeen
+[@@deriving crowbar]
+
+type homp = (int * float)
+and pnorst = (homp * int)
+and knipp = (string * pnorst)
+and florn = | Fjnie of knipp
+[@@deriving crowbar]
+
 type bar = {
   justice: bool;
   purrs: int array;
