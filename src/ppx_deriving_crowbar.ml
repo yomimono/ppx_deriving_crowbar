@@ -153,6 +153,9 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
           (* under what circumstances can pcd_res be non-None and pcd_args be
              populated? *)
           match pcd_res, pcd_args with
+          | None, Pcstr_tuple [] ->
+            let name = Ast_convenience.constr pcd_name.txt [] in
+            [%expr Crowbar.(const [%e name])]
           | None, Pcstr_tuple tuple ->
             let (gens, last_fun) = generate_tuple quoter
               ~name:(Ast_convenience.lid pcd_name.txt) tuple in
