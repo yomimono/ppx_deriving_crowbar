@@ -110,7 +110,6 @@ and generate_tuple quoter ?name tuple =
   let gens = List.map (expr_of_typ quoter) tuple in
   gens, fn_vars_to_tuple
 
-(* TODO: major cargo culting here, I have no idea how this works *)
 let core_type_of_decl ~options ~path type_decl =
   let typ = Ppx_deriving.core_type_of_type_decl type_decl in
   Ppx_deriving.poly_arrow_of_type_decl
