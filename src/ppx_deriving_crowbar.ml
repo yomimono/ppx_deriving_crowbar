@@ -89,7 +89,7 @@ let rec expr_of_typ quoter typ =
     in
     let matches (loc, _) = (0 = String.compare loc.txt unlazify_attribute_name) in
     match List.exists matches typ.ptyp_attributes with
-    | true -> [%expr unlazy [%e fwd]]
+    | true -> [%expr Crowbar.unlazy [%e fwd]]
     | false -> [%expr [%e fwd]]
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
@@ -186,7 +186,7 @@ let tag_recursive_for_unlazifying type_decls =
   let add_tag core_type =
     let loc = Location.mknoloc unlazify_attribute_name in
     let payload : Parsetree.payload =
-       (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr "unlazy"], []))]) in
+       (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr "Crowbar.unlazy"], []))]) in
     let new_tag : Parsetree.attribute = loc, payload in
     Ast_helper.Typ.attr core_type new_tag
   in
