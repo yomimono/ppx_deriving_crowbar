@@ -12,11 +12,13 @@ type fkeen = | A of int
 and meep = | B of fkeen
 [@@deriving crowbar]
 
-type homp = (int * float)
-and pnorst = (homp * int)
-and knipp = (string * pnorst)
-and florn = | Fjnie of knipp
-[@@deriving crowbar]
+module Rdjeimbo = struct
+  type homp = (int * float)
+  and pnorst = (homp * int)
+  and knipp = (string * pnorst)
+  and florn = | Fjnie of knipp
+  [@@deriving crowbar]
+end
 
 type bar = {
   justice: bool;
@@ -45,6 +47,9 @@ type oh_no = ((int * float), string) result
 [@@deriving crowbar]
 
 type hlifd = {b: (int, string) result;}
+[@@deriving crowbar]
+
+type pune = | A
 [@@deriving crowbar]
 
 let () =
