@@ -192,10 +192,16 @@ let tag_recursive_for_unlazifying type_decls =
   in
   let rec tag_on_match (needle : type_declaration) core_type =
     (* TODO: there is certainly a better way to do this comparison *)
-    (* need to also tag any arguments; how do I find them? *)
     let core_type = match core_type.ptyp_desc with
-    | Ptyp_constr (name, args) -> {core_type with ptyp_desc =
-                                                    Ptyp_constr (name, List.map (tag_on_match needle) args)}
+      | Ptyp_constr (name, args) ->
+        (* need to tag the top-level thing too, if it matches *)
+        let core_type =
+          (* TODO: Longident.last is also not right *)
+          if (0 = String.compare (Longident.last name.txt) needle.ptype_name.txt)
+          then add_tag core_type
+          else core_type
+        in
+        {core_type with ptyp_desc = Ptyp_constr (name, List.map (tag_on_match needle) args)}
     | Ptyp_tuple l -> {core_type with ptyp_desc = Ptyp_tuple (List.map
                                                                 (tag_on_match
                                                                    needle) l)}
@@ -206,25 +212,25 @@ let tag_recursive_for_unlazifying type_decls =
     else core_type
   in
   let rec descender needle type_decl =
-   match type_decl.ptype_kind, type_decl.ptype_manifest with
-   | Ptype_abstract, Some manifest -> {type_decl with ptype_manifest = Some (tag_on_match needle manifest) }
-   | Ptype_abstract, None -> type_decl
-   | Ptype_record labels, _ ->
-     let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
-     let labels = List.map check labels in
-     {type_decl with ptype_kind = (Ptype_record labels)}
-   | Ptype_variant constrs, _ ->
-     let constrs = constrs |> List.map @@ fun constr ->
-       match constr.pcd_res with
-       | Some core_type -> {constr with pcd_res = Some (tag_on_match needle core_type)}
-       | None -> match constr.pcd_args with
-         | Pcstr_tuple tuple -> { constr with pcd_args = Pcstr_tuple (List.map (tag_on_match needle) tuple) }
-         | Pcstr_record labels ->
-           let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
-           { constr with pcd_args = Pcstr_record (List.map check labels)}
-     in
-     {type_decl with ptype_kind = (Ptype_variant constrs)}
-   | Ptype_open, _ -> type_decl (* TODO: I don't know what else we could do here *)
+    match type_decl.ptype_kind, type_decl.ptype_manifest with
+    | Ptype_abstract, Some manifest -> {type_decl with ptype_manifest = Some (tag_on_match needle manifest) }
+    | Ptype_abstract, None -> type_decl
+    | Ptype_record labels, _ ->
+      let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
+      let labels = List.map check labels in
+      {type_decl with ptype_kind = (Ptype_record labels)}
+    | Ptype_variant constrs, _ ->
+      let constrs = constrs |> List.map @@ fun constr ->
+        match constr.pcd_res with
+        | Some core_type -> {constr with pcd_res = Some (tag_on_match needle core_type)}
+        | None -> match constr.pcd_args with
+          | Pcstr_tuple tuple -> { constr with pcd_args = Pcstr_tuple (List.map (tag_on_match needle) tuple) }
+          | Pcstr_record labels ->
+            let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
+            { constr with pcd_args = Pcstr_record (List.map check labels)}
+      in
+      {type_decl with ptype_kind = (Ptype_variant constrs)}
+    | Ptype_open, _ -> type_decl (* TODO: I don't know what else we could do here *)
   in
   (* each top-level element in the list has to be fully considered with respect
      to both itself and other items *)

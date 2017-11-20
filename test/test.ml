@@ -28,11 +28,6 @@ type bar = {
   rejweo: quux;
 }
 [@@deriving crowbar]
-type 'a norple = {
-  kwijwor : int;
-  nipstel : 'a;
-}
-[@@deriving crowbar]
 
 type clippy = | A of int | B of {a: int; b: float}
 [@@deriving crowbar]
@@ -49,7 +44,12 @@ type oh_no = ((int * float), string) result
 type hlifd = {b: (int, string) result;}
 [@@deriving crowbar]
 
-type pune = | A
+type 'a norple = {
+  kwijwor : int;
+  nipstel : 'a;
+}
+and pune = | A
+and plongle = pune norple
 [@@deriving crowbar]
 
 let () =
