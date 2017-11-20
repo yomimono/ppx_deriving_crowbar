@@ -1,4 +1,4 @@
-true: warn(@5@8@10@11@12@14@23@24@26@29@40), bin_annot, safe_string, cppo_V_OCAML
+true: warn(@5@8@10@11@12@14@23@24@26@29@40), bin_annot, safe_string
 
 "src": include
-<src/*.{ml,mli,byte,native}>: package(ppx_tools.metaquot), package(ppx_deriving.api), package(result), package(crowbar)
+<src/*.{ml,mli,byte,native}>: package(ppx_tools.metaquot), package(ppx_deriving.api), package(result), package(crowbar), package(compiler-libs)
