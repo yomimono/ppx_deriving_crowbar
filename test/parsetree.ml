@@ -123,3 +123,7 @@ and module_binding = [%import: Parsetree.module_binding]
 type toplevel_phrase = [%import: Parsetree.toplevel_phrase]
 and directive_argument = [%import: Parsetree.directive_argument]
 [@@deriving crowbar]
+
+let () =
+  Crowbar.(add_test ~name:"expression" [generate_expression]
+             (fun expression -> check true))
