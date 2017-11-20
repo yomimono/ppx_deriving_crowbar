@@ -17,7 +17,7 @@
 
 module Lexing = struct
   include Lexing
-  type p = [%import: Lexing.position] [@@deriving crowbar, eq, show]
+  type p = [%import: Lexing.position] [@@deriving crowbar]
   let generate_position = generate_p
 end
 
@@ -126,4 +126,4 @@ and directive_argument = [%import: Parsetree.directive_argument]
 
 let () =
   Crowbar.(add_test ~name:"expression" [generate_expression]
-             (fun expression -> check true))
+             (fun expression -> check_eq expression expression))
