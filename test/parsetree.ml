@@ -17,7 +17,7 @@
 
 module Lexing = struct
   include Lexing
-  type p = [%import: Lexing.position] [@@deriving crowbar]
+  type p = [%import: Lexing.position] [@@deriving crowbar, eq, show]
   let generate_position = generate_p
 end
 

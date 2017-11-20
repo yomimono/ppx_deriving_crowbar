@@ -1,19 +1,9 @@
 version = "%{version}%"
 description = "[@@deriving crowbar]"
-requires(-ppx_driver) = "ppx_deriving ppx_deriving_crowbar.runtime"
+requires(-ppx_driver) = "ppx_deriving"
 ppxopt(-ppx_driver,-custom_ppx) = "ppx_deriving,./ppx_deriving_crowbar.cma"
 requires(ppx_driver) = "ppx_deriving.api"
 archive(ppx_driver, byte) = "ppx_deriving_crowbar.cma"
 archive(ppx_driver, native) = "ppx_deriving_crowbar.cmxa"
 exists_if = "ppx_deriving_crowbar.cma"
 
-package "runtime" (
-  version = "%{version}%"
-  description = "Runtime components of [@@deriving crowbar]"
-  requires = "crowbar result ppx_deriving.runtime"
-  archive(byte) = "ppx_deriving_crowbar_runtime.cma"
-  archive(byte, plugin) = "ppx_deriving_crowbar_runtime.cma"
-  archive(native) = "ppx_deriving_crowbar_runtime.cmxa"
-  archive(native, plugin) = "ppx_deriving_crowbar_runtime.cmxs"
-  exists_if = "ppx_deriving_crowbar_runtime.cma"
-)
