@@ -6,13 +6,6 @@ test:
 	rm -f test/*.cm* test/*.o
 	ocamlfind ocamlopt -ppx '`ocamlfind query ppx_deriving`/ppx_deriving _build/src/ppx_deriving_crowbar.cma' -package crowbar -package ppx_deriving -package compiler-libs -dsource -c test/test.ml
 
-parsetree-source:
-	rm -f test/*.cm* test/*.o
-	ocamlfind ocamlopt -ppx '`ocamlfind query ppx_import`/ppx_import' -ppx '`ocamlfind query ppx_deriving`/ppx_deriving _build/src/ppx_deriving_crowbar.cma' -package crowbar -package ppx_deriving -package compiler-libs -dsource -c test/parsetree.ml
-
-parsetree:
-	ocamlfind ocamlopt -ppx '`ocamlfind query ppx_import`/ppx_import' -ppx '`ocamlfind query ppx_deriving`/ppx_deriving _build/src/ppx_deriving_crowbar.cma' -package crowbar -package ppx_deriving.runtime -package compiler-libs -package ocaml-migrate-parsetree -linkall -linkpkg test/asttypes.ml test/parsetree.ml -o test/$@
-
 clean:
 	ocamlbuild -clean
 
