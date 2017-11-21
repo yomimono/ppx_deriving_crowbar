@@ -1,7 +1,6 @@
-type snorp = int
-[@@deriving crowbar]
+type snorp
 
-type foo = A of int | B of float | C of quux
+type foo = A of snorp [@generator Crowbar.const 2] | B of quux
 and quux = Q of int | R of foo | D of foo list
 [@@deriving crowbar]
 
@@ -56,7 +55,8 @@ let () =
   Crowbar.(add_test ~name:"everything is awesome"
              [foo_to_crowbar; bar_to_crowbar; quux_to_crowbar]
              (fun foo _bar _quux -> check @@ match foo with
-      | A i -> Printf.printf "an int: %d\n%!" i; true
+      | A 2 -> true
+      | A i -> false
       | B f -> Printf.printf "a float: %f\n%!" f; true
       | C _ -> (Printf.printf "OMG, something exotic!\n%!"); true)
           )
