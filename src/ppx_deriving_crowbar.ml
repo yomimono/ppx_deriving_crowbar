@@ -58,7 +58,7 @@ let rec expr_of_typ quoter typ =
     | [%type: nativeint]
     | [%type: Nativeint.t] -> [%expr Crowbar.(map [int] Nativeint.of_int)]
     (* TODO: polymorphic variants *)
-    (* also TODO: do we DTRT for [@nobuiltin]? *)
+    (* also TODO: do we DTRT for [@nobuiltin]?  nope. *)
     | [%type: [%t? typ] option] ->
       [%expr Crowbar.(map [bool; [%e expr_of_typ typ]]
                         (fun a b -> if a then Some b else None))]

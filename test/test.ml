@@ -1,8 +1,8 @@
-type snorp
+(* type snorp
 
 type foo = A of snorp [@generator Crowbar.const 2] | B of quux
 and quux = Q of int | R of foo | D of foo list
-[@@deriving crowbar]
+[@@deriving crowbar] *)
 
 type ploomple = int option * float * bool ref
 [@@deriving crowbar]
@@ -11,8 +11,10 @@ type fkeen = | A of int
 and meep = | B of fkeen
 [@@deriving crowbar]
 
+let homp_to_crowbar = Crowbar.const (2, 2.)
+
 module Rdjeimbo = struct
-  type homp = (int * float)
+  type homp = (int * float) [@nobuiltin]
   and pnorst = (homp * int)
   and knipp = (string * pnorst)
   and florn = | Fjnie of knipp
