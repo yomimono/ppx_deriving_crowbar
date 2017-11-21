@@ -10,8 +10,6 @@ let raise_errorf = Ppx_deriving.raise_errorf
 (* currently we ignore all options *)
 
 let mangler = Ppx_deriving.(`Suffix "to_crowbar")
-  (* TODO: should be to_crowbar or to_crowbar_gen or some such, probably;
-     reread name rules *)
 let unlazify_attribute_name = "crowbar_recursive_typedef_please_unlazy"
   (* TODO: actually make sure this is unique *)
 
@@ -35,8 +33,7 @@ let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
     (Ast_helper.Pat.var (Location.mknoloc arg))
     function_body
 
-let lazify e =
-  [%expr lazy [%e e]]
+let lazify e = [%expr lazy [%e e]]
 
 let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
@@ -60,7 +57,7 @@ let rec expr_of_typ quoter typ =
     | [%type: Bytes.t] -> [%expr Crowbar.(map [bytes] Bytes.of_string)]
     | [%type: nativeint]
     | [%type: Nativeint.t] -> [%expr Crowbar.(map [int] Nativeint.of_int)]
-    (* TODO: polymorphic variants, general parameterized types *)
+    (* TODO: polymorphic variants *)
     (* also TODO: do we DTRT for [@nobuiltin]? *)
     | [%type: [%t? typ] option] ->
       [%expr Crowbar.(map [bool; [%e expr_of_typ typ]]
@@ -141,7 +138,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
     | Ptype_abstract, None ->
-      (* we have a ptype_name, so we can try for a generate_foo in the namespace *)
+      (* we have a ptype_name, so we can try for a foo_to_crowbar in the namespace *)
       let name = app (Exp.ident (Ast_convenience.lid (Ppx_deriving.mangle_type_decl mangler type_decl))) [] in
       [%expr [%e name]]
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
@@ -173,7 +170,6 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
          variant types, and then invoke Crowbar.choose on the list of them. *)
       [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   in
-  (* TODO: this is intensely cargo-culted, figure out what's actually needed *)
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
       ~path type_decl in
@@ -191,20 +187,18 @@ let tag_recursive_for_unlazifying type_decls =
     Ast_helper.Typ.attr core_type new_tag
   in
   let rec tag_on_match (needle : type_declaration) core_type =
-    (* TODO: there is certainly a better way to do this comparison *)
     let core_type = match core_type.ptyp_desc with
       | Ptyp_constr (name, args) ->
         (* need to tag the top-level thing too, if it matches *)
         let core_type =
-          (* TODO: Longident.last is also not right *)
           if (0 = String.compare (Longident.last name.txt) needle.ptype_name.txt)
           then add_tag core_type
           else core_type
         in
-        {core_type with ptyp_desc = Ptyp_constr (name, List.map (tag_on_match needle) args)}
-    | Ptyp_tuple l -> {core_type with ptyp_desc = Ptyp_tuple (List.map
-                                                                (tag_on_match
-                                                                   needle) l)}
+        {core_type with ptyp_desc =
+                        Ptyp_constr (name, List.map (tag_on_match needle) args)}
+      | Ptyp_tuple l -> {core_type with ptyp_desc =
+                                 Ptyp_tuple (List.map (tag_on_match needle) l)}
     | _ -> core_type
     in
     if (0 = String.compare (Ppx_deriving.string_of_core_type core_type) needle.ptype_name.txt)
@@ -213,7 +207,8 @@ let tag_recursive_for_unlazifying type_decls =
   in
   let rec descender needle type_decl =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
-    | Ptype_abstract, Some manifest -> {type_decl with ptype_manifest = Some (tag_on_match needle manifest) }
+    | Ptype_abstract, Some manifest ->
+      {type_decl with ptype_manifest = Some (tag_on_match needle manifest) }
     | Ptype_abstract, None -> type_decl
     | Ptype_record labels, _ ->
       let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
@@ -224,9 +219,12 @@ let tag_recursive_for_unlazifying type_decls =
         match constr.pcd_res with
         | Some core_type -> {constr with pcd_res = Some (tag_on_match needle core_type)}
         | None -> match constr.pcd_args with
-          | Pcstr_tuple tuple -> { constr with pcd_args = Pcstr_tuple (List.map (tag_on_match needle) tuple) }
+          | Pcstr_tuple tuple ->
+            { constr with pcd_args = Pcstr_tuple (List.map (tag_on_match needle) tuple) }
           | Pcstr_record labels ->
-            let check label = { label with pld_type = (tag_on_match needle label.pld_type)} in
+            let check label = { label with
+                                pld_type = (tag_on_match needle label.pld_type)}
+            in
             { constr with pcd_args = Pcstr_record (List.map check labels)}
       in
       {type_decl with ptype_kind = (Ptype_variant constrs)}
