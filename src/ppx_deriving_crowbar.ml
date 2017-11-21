@@ -9,7 +9,7 @@ let raise_errorf = Ppx_deriving.raise_errorf
 
 (* currently we ignore all options *)
 
-let mangler = Ppx_deriving.(`Prefix "generate")
+let mangler = Ppx_deriving.(`Suffix "to_crowbar")
   (* TODO: should be to_crowbar or to_crowbar_gen or some such, probably;
      reread name rules *)
 let unlazify_attribute_name = "crowbar_recursive_typedef_please_unlazy"
