@@ -151,30 +151,31 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     (gens, fn_vars_to_record)
   in
   let generator =
-    match attr_generator type_decl.ptype_attributes with
-    | Some generator -> generator
-    | None ->
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_open, _ -> raise_errorf "%s cannot be derived for open type" deriver (* TODO: can we do better? *)
     | Ptype_abstract, Some manifest ->
       expr_of_typ quoter manifest
-    | Ptype_abstract, None ->
-      (* we have a ptype_name, so we can try for a foo_to_crowbar in the namespace *)
-      let name = app (Exp.ident (Ast_convenience.lid (Ppx_deriving.mangle_type_decl mangler type_decl))) [] in
-      [%expr [%e name]]
+    | Ptype_abstract, None -> begin
+        match attr_generator type_decl.ptype_attributes with
+        | Some generator -> generator
+        | None ->
+          (* we have a ptype_name foo, so try foo_to_crowbar in the namespace *)
+          app (Exp.ident (Ast_convenience.lid
+                            (Ppx_deriving.mangle_type_decl mangler type_decl)))
+          []
+      end
     | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
                                    non-empty list *)
       let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
       [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
     | Ptype_variant constrs, _ ->
-      let cases = constrs |> List.map (fun{pcd_attributes; pcd_name; pcd_res; pcd_args} ->
-          match attr_generator pcd_attributes with
-          | Some generator -> generator
-          | None ->
+      let cases = constrs |>
+                  List.map (fun {pcd_attributes; pcd_name; pcd_res; pcd_args} ->
           (* under what circumstances can pcd_res be non-None and pcd_args be
              populated? *)
           match pcd_res, pcd_args with
           | None, Pcstr_tuple [] ->
+
             let name = Ast_convenience.constr pcd_name.txt [] in
             [%expr Crowbar.(const [%e name])]
           | None, Pcstr_tuple tuple ->

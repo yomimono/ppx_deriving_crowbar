@@ -1,14 +1,14 @@
-(*
 module Glorn : sig
   type snorp
 end = struct
   type snorp = int
 end
-*)
+
 type plot = int [@generator Crowbar.const 1]
 [@@deriving crowbar]
+
 type foo = A of int [@generator Crowbar.const 2]
-         | B of plot [@generator Crowbar.map [Crowbar.float] int_of_float]
+         | B of int [@generator Crowbar.map [Crowbar.float] int_of_float]
 and quux = Q of int | R of foo | D of foo list
 [@@deriving crowbar]
 
@@ -21,9 +21,6 @@ type knorp = {
 }
 [@@deriving crowbar]
 
-type pnerp = lespf [@generator Crowbar.const ("pliskort")]
-[@@deriving crowbar]
-(*
 type fkeen = | A of int
 and meep = | B of fkeen
 [@@deriving crowbar]
@@ -35,7 +32,7 @@ module Rdjeimbo = struct
   and florn = | Fjnie of knipp
   [@@deriving crowbar]
 end
-(* 
+
 type bar = {
   justice: bool;
   purrs: int array;
@@ -44,7 +41,7 @@ type bar = {
   rejweo: quux;
 }
 [@@deriving crowbar]
-*)
+
 type clippy = | A of int | B of {a: int; b: float}
 [@@deriving crowbar]
 
@@ -74,6 +71,5 @@ let () =
              (fun foo _bar _quux -> check @@ match foo with
       | A 2 -> true
       | A i -> false
-      | B f -> Printf.printf "a float: %f\n%!" f; true
-      | C _ -> (Printf.printf "OMG, something exotic!\n%!"); true)
-          ) *)
+      | _ -> true
+             ))
