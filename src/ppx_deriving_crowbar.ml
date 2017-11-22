@@ -8,13 +8,18 @@ let deriver = "crowbar"
 let raise_errorf = Ppx_deriving.raise_errorf
 
 (* currently we ignore all options *)
+let parse_options options =
+  options |> List.iter (fun (name, expr) ->
+    match name with
+      | _ -> raise_errorf ~loc:expr.pexp_loc "%s does not support option %s"
+               deriver name)
 
 let mangler = Ppx_deriving.(`Suffix "to_crowbar")
 let unlazify_attribute_name = "crowbar_recursive_typedef_please_unlazy"
   (* TODO: actually make sure this is unique *)
 
-let attr_nobuiltin attrs =
-  Ppx_deriving.(attrs |> attr ~deriver "nobuiltin" |> Arg.get_flag ~deriver)
+let attr_generator attrs =
+  Ppx_deriving.(attrs |> attr ~deriver "generator" |> Arg.(get_attr ~deriver expr))
 
 let make_crowbar_list l =
   let consify add_me extant =
@@ -37,6 +42,16 @@ let lazify e = [%expr lazy [%e e]]
 
 let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
+  let () = match typ.ptyp_attributes with
+  | [] -> Printf.printf "%s has no attributes\n%!"
+            (Ppx_deriving.string_of_core_type typ)
+  | l -> Printf.printf "%s has %d attributes (first %s)\n%!"
+           (Ppx_deriving.string_of_core_type typ)
+           (List.length l) (List.hd l |> fun (loc, payload) -> loc.txt)
+  in
+  match attr_generator typ.ptyp_attributes with
+  | Some generator -> Ppx_deriving.quote quoter generator
+  | None ->
   let typ = Ppx_deriving.remove_pervasives ~deriver typ in
   match typ with
   | { ptyp_desc = Ptyp_constr ({ txt = lid }, args) } ->
@@ -118,7 +133,10 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
   let path = Ppx_deriving.path_of_type_decl ~path type_decl in
   let gens_and_fn_of_labels ?name labels =
-    let gens = labels |> List.map (fun {pld_type} -> expr_of_typ quoter pld_type) in
+    let gens = labels |> List.map (fun {pld_type; pld_attributes} ->
+        match attr_generator pld_attributes with
+        | Some generator -> generator
+        | None -> expr_of_typ quoter pld_type) in
     let vars = n_vars (List.length labels) [] in
     let field_assignments = labels |> List.mapi (fun n {pld_name} ->
       let lid = Ast_convenience.lid pld_name.txt in
@@ -133,6 +151,9 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     (gens, fn_vars_to_record)
   in
   let generator =
+    match attr_generator type_decl.ptype_attributes with
+    | Some generator -> generator
+    | None ->
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_open, _ -> raise_errorf "%s cannot be derived for open type" deriver (* TODO: can we do better? *)
     | Ptype_abstract, Some manifest ->
@@ -146,7 +167,10 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
       let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
       [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
     | Ptype_variant constrs, _ ->
-      let cases = constrs |> List.map (fun {pcd_name; pcd_res; pcd_args} ->
+      let cases = constrs |> List.map (fun{pcd_attributes; pcd_name; pcd_res; pcd_args} ->
+          match attr_generator pcd_attributes with
+          | Some generator -> generator
+          | None ->
           (* under what circumstances can pcd_res be non-None and pcd_args be
              populated? *)
           match pcd_res, pcd_args with
@@ -255,9 +279,12 @@ let unlazify type_decl =
     Str.value Nonrecursive [Vb.mk (pvar name) (polymorphize lazy_fn)]
 
 let deriver = Ppx_deriving.create deriver
-    ~core_type:(Ppx_deriving.with_quoter (fun quoter typ -> expr_of_typ quoter
-                                             typ))
+    ~core_type:(fun core_type -> Printf.printf "core_type %s\n%!" @@
+                  Ppx_deriving.string_of_core_type core_type;
+      Ppx_deriving.with_quoter
+                  (fun quoter typ -> expr_of_typ quoter typ) core_type)
     ~type_decl_str:(fun ~options ~path type_decls ->
+        Printf.printf "type_decl_str\n%!";
         let type_decls = tag_recursive_for_unlazifying type_decls in
         let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
         (Str.value Recursive bodies) ::

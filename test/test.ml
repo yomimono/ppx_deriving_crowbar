@@ -1,26 +1,41 @@
-(* type snorp
-
-type foo = A of snorp [@generator Crowbar.const 2] | B of quux
+(*
+module Glorn : sig
+  type snorp
+end = struct
+  type snorp = int
+end
+*)
+type plot = int [@generator Crowbar.const 1]
+[@@deriving crowbar]
+type foo = A of int [@generator Crowbar.const 2]
+         | B of plot [@generator Crowbar.map [Crowbar.float] int_of_float]
 and quux = Q of int | R of foo | D of foo list
-[@@deriving crowbar] *)
-
-type ploomple = int option * float * bool ref
 [@@deriving crowbar]
 
+type ploomple = int option * float * bool ref
+                  [@generator Crowbar.const (None, 4., ref false)]
+[@@deriving crowbar]
+
+type knorp = {
+  a : float [@generator Crowbar.const 4.]
+}
+[@@deriving crowbar]
+
+type pnerp = lespf [@generator Crowbar.const ("pliskort")]
+[@@deriving crowbar]
+(*
 type fkeen = | A of int
 and meep = | B of fkeen
 [@@deriving crowbar]
 
-let homp_to_crowbar = Crowbar.const (2, 2.)
-
 module Rdjeimbo = struct
-  type homp = (int * float) [@nobuiltin]
+  type homp = (int * float)
   and pnorst = (homp * int)
   and knipp = (string * pnorst)
   and florn = | Fjnie of knipp
   [@@deriving crowbar]
 end
-
+(* 
 type bar = {
   justice: bool;
   purrs: int array;
@@ -29,7 +44,7 @@ type bar = {
   rejweo: quux;
 }
 [@@deriving crowbar]
-
+*)
 type clippy = | A of int | B of {a: int; b: float}
 [@@deriving crowbar]
 
@@ -61,4 +76,4 @@ let () =
       | A i -> false
       | B f -> Printf.printf "a float: %f\n%!" f; true
       | C _ -> (Printf.printf "OMG, something exotic!\n%!"); true)
-          )
+          ) *)
