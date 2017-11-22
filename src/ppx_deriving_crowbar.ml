@@ -42,13 +42,6 @@ let lazify e = [%expr lazy [%e e]]
 
 let rec expr_of_typ quoter typ =
   let expr_of_typ = expr_of_typ quoter in
-  let () = match typ.ptyp_attributes with
-  | [] -> Printf.printf "%s has no attributes\n%!"
-            (Ppx_deriving.string_of_core_type typ)
-  | l -> Printf.printf "%s has %d attributes (first %s)\n%!"
-           (Ppx_deriving.string_of_core_type typ)
-           (List.length l) (List.hd l |> fun (loc, payload) -> loc.txt)
-  in
   match attr_generator typ.ptyp_attributes with
   | Some generator -> Ppx_deriving.quote quoter generator
   | None ->
@@ -280,12 +273,9 @@ let unlazify type_decl =
     Str.value Nonrecursive [Vb.mk (pvar name) (polymorphize lazy_fn)]
 
 let deriver = Ppx_deriving.create deriver
-    ~core_type:(fun core_type -> Printf.printf "core_type %s\n%!" @@
-                  Ppx_deriving.string_of_core_type core_type;
-      Ppx_deriving.with_quoter
-                  (fun quoter typ -> expr_of_typ quoter typ) core_type)
+    ~core_type:(Ppx_deriving.with_quoter
+                  (fun quoter typ -> expr_of_typ quoter typ))
     ~type_decl_str:(fun ~options ~path type_decls ->
-        Printf.printf "type_decl_str\n%!";
         let type_decls = tag_recursive_for_unlazifying type_decls in
         let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
         (Str.value Recursive bodies) ::
