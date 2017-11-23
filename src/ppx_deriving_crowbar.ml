@@ -250,7 +250,15 @@ let tag_recursive_for_unlazifying type_decls =
         {core_type with ptyp_desc =
                         Ptyp_constr (name, List.map (tag_on_match needle) args)}
       | Ptyp_tuple l -> {core_type with ptyp_desc =
-                                 Ptyp_tuple (List.map (tag_on_match needle) l)}
+                        Ptyp_tuple (List.map (tag_on_match needle) l)}
+      | Ptyp_variant (fields, openness, labels) ->
+        let dig = function
+          | Rinherit _ as a -> a
+          | Rtag (a, b, c, d) -> Rtag (a, b, c, List.map (tag_on_match needle) d)
+        in
+        {core_type with ptyp_desc =
+                          Ptyp_variant ((List.map dig fields), openness, labels)}
+
     | _ -> core_type
     in
     if (0 = String.compare (Ppx_deriving.string_of_core_type core_type) needle.ptype_name.txt)
