@@ -1,4 +1,4 @@
-module Glorn : sig
+(* module Glorn : sig
   type snorp
 end = struct
   type snorp = int
@@ -15,7 +15,17 @@ and quux = Q of int | R of foo | D of foo list
 type ploomple = int option * float * bool ref
                   [@generator Crowbar.const (None, 4., ref false)]
 [@@deriving crowbar]
+*)
+type strorple = [
+    `Thorcla of string
+  | `Mlorstri of int
+] and clist = [
+    `Omon
+  | `Kilder of bool * strorple list
+  ] [@@deriving crowbar]
 
+let q = `Thorcla "spiders"
+(*
 type knorp = {
   a : float [@generator Crowbar.const 4.]
 }
@@ -73,3 +83,5 @@ let () =
       | A i -> false
       | _ -> true
              ))
+
+   *)

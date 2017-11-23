@@ -102,13 +102,43 @@ let rec expr_of_typ quoter typ =
     [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_desc = Ptyp_var name } -> Ast_convenience.evar ("poly_"^name)
   | { ptyp_desc = Ptyp_alias (typ, _) } -> expr_of_typ typ
+  | { ptyp_desc = Ptyp_variant (fields, openness, labels);ptyp_loc} ->
+        (* I think we don't care about open vs closed, we just want to wrap thee
+           things in the right rows; similarly we don't care about labels *)
+        (* just like for non-poly variants, we need to choose from the set of
+           available things (which we can't get more clues about than this here
+           typedef... hm, unless the labels are clues, actually; TODO think
+           about that a bit more, I think they're not but make sure). *)
+    let translate = function
+      | Rinherit typ -> expr_of_typ typ
+      | Rtag (label, attrs, _, []) ->
+        (* nullary, just use the label name *)
+        [%expr Crowbar.const [%e Ast_helper.Exp.variant label None]]
+      | Rtag (label, attrs, _, [{ptyp_desc = Ptyp_tuple tuple}]) ->
+        (* good ol' tuples *)
+        let (gens, last_fun) =
+          generate_tuple quoter
+            ~constructor:(Ast_helper.Exp.variant label) tuple in
+        [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
+      | Rtag (label, attrs, _, [typ] (* one non-tuple thing *)) ->
+        let var = "a" in
+        let body = Ast_helper.Exp.(variant label
+            (Some (ident @@ Ast_convenience.lid var))) in
+        let fn = last_fun var body in
+        [%expr Crowbar.(map [[%e expr_of_typ typ]] [%e fn])]
+                                                 
+      | Rtag (_,_,_,_) -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
+                      deriver (Ppx_deriving.string_of_core_type typ)
+    in
+    let cases = List.map translate fields in
+    [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
-and generate_tuple quoter ?name tuple =
+and generate_tuple quoter ?constructor tuple =
   let vars = n_vars (List.length tuple) [] in
   let vars_tuple = List.map Ast_convenience.evar vars |> Ast_convenience.tuple in
-  let vars_tuple = match name with
-  | Some name -> Ast_helper.Exp.construct name (Some vars_tuple)
+  let vars_tuple = match constructor with
+  | Some constructor -> constructor (Some vars_tuple)
   | None -> vars_tuple
   in
   let fn_vars_to_tuple = List.fold_right last_fun vars vars_tuple in
@@ -125,6 +155,8 @@ let core_type_of_decl ~options ~path type_decl =
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
   let quoter = Ppx_deriving.create_quoter () in
   let path = Ppx_deriving.path_of_type_decl ~path type_decl in
+  (* TODO: generalize this to "a list of things that have a type and attributes"
+     rather than labels; we could use it more generally *)
   let gens_and_fn_of_labels ?name labels =
     let gens = labels |> List.map (fun {pld_type; pld_attributes} ->
         match attr_generator pld_attributes with
@@ -173,7 +205,9 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
             [%expr Crowbar.(const [%e name])]
           | None, Pcstr_tuple tuple ->
             let (gens, last_fun) = generate_tuple quoter
-              ~name:(Ast_convenience.lid pcd_name.txt) tuple in
+                ~constructor:(
+                  Ast_helper.Exp.construct @@ Ast_convenience.lid pcd_name.txt)
+                    tuple in
             [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
