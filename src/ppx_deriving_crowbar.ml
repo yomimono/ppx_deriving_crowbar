@@ -299,7 +299,7 @@ let unlazify type_decl =
   let fn_name_ident = Exp.ident (Ast_convenience.lid name) in
   let args = Ppx_deriving.fold_right_type_decl
       (fun str args -> (Asttypes.Nolabel, Exp.ident (Ast_convenience.lid
-                                                       ("poly_"^str)))::args)
+                                                       ("poly_"^(str.txt))))::args)
       type_decl []
   in
   match args with
