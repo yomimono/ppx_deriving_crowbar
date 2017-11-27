@@ -68,8 +68,7 @@ let rec expr_of_typ quoter typ =
     (* TODO: polymorphic variants *)
     (* also TODO: do we DTRT for [@nobuiltin]?  nope. *)
     | [%type: [%t? typ] option] ->
-      [%expr Crowbar.(map [bool; [%e expr_of_typ typ]]
-                        (fun a b -> if a then Some b else None))]
+      [%expr Crowbar.(option [%e expr_of_typ typ])]
     | [%type: [%t? typ] ref] ->
       [%expr Crowbar.(map [[%e expr_of_typ typ]] (fun a -> ref a))]
     | [%type: [%t? typ] list] ->
