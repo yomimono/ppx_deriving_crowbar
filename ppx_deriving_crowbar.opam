@@ -11,7 +11,7 @@ available: [ ocaml-version >= "4.05" ]
 depends: [
   "ocamlbuild" {build}
   "ocamlfind" {build}
-  "ppx_deriving"
+  "ppx_deriving" { = "4.1.5" }
   "ppx_tools"
   "crowbar"
 ]
