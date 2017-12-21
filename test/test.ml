@@ -83,3 +83,11 @@ let () =
       | A i -> false
       | _ -> true
              ))
+module type Krampus = sig
+  type binary = | Yes | No | File_not_found
+  type nest = {
+    enabled : binary;
+    super_secure_password : string;
+  }
+end [@@deriving crowbar]
+
