@@ -327,7 +327,6 @@ let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
       Pmty_alias _ -> raise_errorf ~loc:pmty_loc "%s cannot interpret module \
       type description %s" deriver pmtd_name.txt
     | Pmty_signature sigs ->
-      (* we really need to get the full set of decls and concatenate them *)
       let structs =
         List.(flatten @@ map (fun s ->
           match s.psig_desc with
@@ -348,11 +347,15 @@ let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
          are submodules?  Then I thought, those should be in structs though.
          Then I thought, it's easier to just leave it as a TODO for now and then
          I can figure it out when I have actual generated things to look at. *)
-      (* let structure = Pstr_module name module_expr Pmod_structure structs in
-      *)
+      (* cheat and do a local open of the source thing (TODO actually emit the
+         full names of types when necessary) *)
+      let local_open = Ast_helper.Str.mk
+          (Pstr_open (Ast_helper.Opn.mk (Ast_convenience.lid pmtd_name.txt))) in
+      let structs = local_open :: structs in
       (* contortions to mangle the module name *)
       let name = Longident.parse pmtd_name.txt |> Ppx_deriving.mangle_lid
                    mangler |> Longident.last |> Location.mknoloc in
+      (* wrap the structures in their cozy module *)
       let module_expr = Ast_helper.Mod.mk (Pmod_structure structs) in
       let module_binding = Ast_helper.Mb.mk name module_expr in
       let s = Pstr_module module_binding in
@@ -367,7 +370,6 @@ let deriver = Ppx_deriving.create deriver
         (Str.value Recursive bodies) ::
         (List.map unlazify type_decls))
     ~module_type_decl_str:(fun ~options ~path module_type_decl ->
-        (* can return a structure here, yay! *)
         (* we just want to iterate over all the type declarations inside, and
            wrap that in a module *)
         generators_of_module_type ~options ~path module_type_decl
