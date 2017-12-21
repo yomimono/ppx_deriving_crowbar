@@ -342,21 +342,23 @@ let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
             let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
             (Str.value Recursive bodies) :: (List.map unlazify type_decls)
           ) sigs) in
+      (* we can retain the filtered sigs alongside the new structs I guess? *)
+      let sigs = List.(flatten @@ map (fun s -> match s.psig_desc with
+          | Psig_type (rec_flag, types) -> [Ast_helper.Str.mk (Pstr_type
+                                                                (rec_flag,
+                                                                 types))]
+          | _ -> []) sigs
+      ) in
       (* I thought about not making a module at all if structs is empty and just
          returning, ourselves, the empty list.  Then I thought, what if there
          are submodules?  Then I thought, those should be in structs though.
          Then I thought, it's easier to just leave it as a TODO for now and then
          I can figure it out when I have actual generated things to look at. *)
-      (* cheat and do a local open of the source thing (TODO actually emit the
-         full names of types when necessary) *)
-      let local_open = Ast_helper.Str.mk
-          (Pstr_open (Ast_helper.Opn.mk (Ast_convenience.lid pmtd_name.txt))) in
-      let structs = local_open :: structs in
       (* contortions to mangle the module name *)
       let name = Longident.parse pmtd_name.txt |> Ppx_deriving.mangle_lid
                    mangler |> Longident.last |> Location.mknoloc in
       (* wrap the structures in their cozy module *)
-      let module_expr = Ast_helper.Mod.mk (Pmod_structure structs) in
+      let module_expr = Ast_helper.Mod.mk (Pmod_structure (sigs @ structs)) in
       let module_binding = Ast_helper.Mb.mk name module_expr in
       let s = Pstr_module module_binding in
       [Ast_helper.Str.mk s]
