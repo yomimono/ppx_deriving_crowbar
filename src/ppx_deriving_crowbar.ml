@@ -311,9 +311,6 @@ let unlazify type_decl =
     let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
     Str.value Nonrecursive [Vb.mk (pvar name) (polymorphize lazy_fn)]
 
-(* inverse of type_decls_of_module_type... *)
-let wrap_in_module mod_name s = ()
-
 (* TODO this has to be structure_of_type_module, where any type_decls in the
    structure have had generators called for them (including recursively in any
    submodules), returning a structure with the renamed module at the top level
@@ -371,11 +368,7 @@ let deriver = Ppx_deriving.create deriver
         let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
         (Str.value Recursive bodies) ::
         (List.map unlazify type_decls))
-    ~module_type_decl_str:(fun ~options ~path module_type_decl ->
-        (* we just want to iterate over all the type declarations inside, and
-           wrap that in a module *)
-        generators_of_module_type ~options ~path module_type_decl
-      )
+    ~module_type_decl_str:generators_of_module_type
     ()
 
 let () = Ppx_deriving.register deriver
