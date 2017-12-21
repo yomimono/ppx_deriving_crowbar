@@ -314,9 +314,11 @@ let unlazify type_decl =
 (* inverse of type_decls_of_module_type... *)
 let wrap_in_module mod_name s = ()
 
-(* module_type_declaration -> type_declaration list option for now. this is
-   potentially a tree, so the actual structure will TODO be more complicated *)
-let rec type_decls_of_module_type { pmtd_name; pmtd_type; _ } =
+(* TODO this has to be structure_of_type_module, where any type_decls in the
+   structure have had generators called for them (including recursively in any
+   submodules), returning a structure with the renamed module at the top level
+   *)
+let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
   match pmtd_type with
   | None -> []
   | Some {pmty_desc; pmty_loc; _} -> match pmty_desc with
@@ -326,16 +328,35 @@ let rec type_decls_of_module_type { pmtd_name; pmtd_type; _ } =
       type description %s" deriver pmtd_name.txt
     | Pmty_signature sigs ->
       (* we really need to get the full set of decls and concatenate them *)
-      List.(flatten @@ map (fun s ->
+      let structs =
+        List.(flatten @@ map (fun s ->
           match s.psig_desc with
           (* we are interested only in type declarations *)
-          | Psig_type (_, decls) -> decls
           | Psig_value _ | Psig_typext _ | Psig_exception _
           | Psig_module _ (* TODO: we may be able to descend here? *)
           | Psig_recmodule _ | Psig_open _ | Psig_include _ | Psig_class _
           | Psig_class_type _ | Psig_attribute _ | Psig_extension _ -> []
-          | Psig_modtype s -> type_decls_of_module_type s
-        ) sigs)
+          | Psig_modtype s ->
+            generators_of_module_type ~options ~path s
+          | Psig_type (flag, type_decls) ->
+            let type_decls = tag_recursive_for_unlazifying type_decls in
+            let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
+            (Str.value Recursive bodies) :: (List.map unlazify type_decls)
+          ) sigs) in
+      (* I thought about not making a module at all if structs is empty and just
+         returning, ourselves, the empty list.  Then I thought, what if there
+         are submodules?  Then I thought, those should be in structs though.
+         Then I thought, it's easier to just leave it as a TODO for now and then
+         I can figure it out when I have actual generated things to look at. *)
+      (* let structure = Pstr_module name module_expr Pmod_structure structs in
+      *)
+      (* contortions to mangle the module name *)
+      let name = Longident.parse pmtd_name.txt |> Ppx_deriving.mangle_lid
+                   mangler |> Longident.last |> Location.mknoloc in
+      let module_expr = Ast_helper.Mod.mk (Pmod_structure structs) in
+      let module_binding = Ast_helper.Mb.mk name module_expr in
+      let s = Pstr_module module_binding in
+      [Ast_helper.Str.mk s]
 
 let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter
@@ -349,12 +370,7 @@ let deriver = Ppx_deriving.create deriver
         (* can return a structure here, yay! *)
         (* we just want to iterate over all the type declarations inside, and
            wrap that in a module *)
-        let type_decls = type_decls_of_module_type module_type_decl in
-        (* TODO wrap these in a module too *)
-        let type_decls = tag_recursive_for_unlazifying type_decls in
-        let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
-        (Str.value Recursive bodies) ::
-        (List.map unlazify type_decls)
+        generators_of_module_type ~options ~path module_type_decl
       )
     ()
 
