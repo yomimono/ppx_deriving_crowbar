@@ -311,26 +311,31 @@ let unlazify type_decl =
     let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
     Str.value Nonrecursive [Vb.mk (pvar name) (polymorphize lazy_fn)]
 
+(* inverse of type_decls_of_module_type... *)
+let wrap_in_module mod_name s = ()
+
 (* module_type_declaration -> type_declaration list option for now. this is
    potentially a tree, so the actual structure will TODO be more complicated *)
 let rec type_decls_of_module_type { pmtd_name; pmtd_type; _ } =
   match pmtd_type with
-  | None -> None
+  | None -> []
   | Some {pmty_desc; pmty_loc; _} -> match pmty_desc with
-    | Pmty_ident _ -> None
+    | Pmty_ident _ -> []
     | Pmty_functor _ | Pmty_with _ | Pmty_typeof _ | Pmty_extension _ |
       Pmty_alias _ -> raise_errorf ~loc:pmty_loc "%s cannot interpret module \
       type description %s" deriver pmtd_name.txt
-    | Pmty_signature s -> (* we can do something with that *)
-      List.hd s |>
-      fun s -> match s.psig_desc with
-      (* we are interested only in type declarations *)
-      | Psig_type (_, decls) -> Some decls
-      | Psig_value _ | Psig_typext _ | Psig_exception _
-      | Psig_module _ (* TODO: we may be able to descend here? *)
-      | Psig_recmodule _ | Psig_open _ | Psig_include _ | Psig_class _
-      | Psig_class_type _ | Psig_attribute _ | Psig_extension _ -> None 
-      | Psig_modtype s -> None (* TODO this should definitely descend *)
+    | Pmty_signature sigs ->
+      (* we really need to get the full set of decls and concatenate them *)
+      List.(flatten @@ map (fun s ->
+          match s.psig_desc with
+          (* we are interested only in type declarations *)
+          | Psig_type (_, decls) -> decls
+          | Psig_value _ | Psig_typext _ | Psig_exception _
+          | Psig_module _ (* TODO: we may be able to descend here? *)
+          | Psig_recmodule _ | Psig_open _ | Psig_include _ | Psig_class _
+          | Psig_class_type _ | Psig_attribute _ | Psig_extension _ -> []
+          | Psig_modtype s -> type_decls_of_module_type s
+        ) sigs)
 
 let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter
@@ -344,14 +349,12 @@ let deriver = Ppx_deriving.create deriver
         (* can return a structure here, yay! *)
         (* we just want to iterate over all the type declarations inside, and
            wrap that in a module *)
-        match type_decls_of_module_type module_type_decl with
-        | None -> []
-        | Some type_decls ->
-          (* TODO wrap these in a module too *)
-          let type_decls = tag_recursive_for_unlazifying type_decls in
-          let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
-          (Str.value Recursive bodies) ::
-          (List.map unlazify type_decls)
+        let type_decls = type_decls_of_module_type module_type_decl in
+        (* TODO wrap these in a module too *)
+        let type_decls = tag_recursive_for_unlazifying type_decls in
+        let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
+        (Str.value Recursive bodies) ::
+        (List.map unlazify type_decls)
       )
     ()
 
