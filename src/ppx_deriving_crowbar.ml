@@ -311,18 +311,42 @@ let unlazify type_decl =
     let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
     Str.value Nonrecursive [Vb.mk (pvar name) (polymorphize lazy_fn)]
 
-(* TODO this has to be structure_of_type_module, where any type_decls in the
-   structure have had generators called for them (including recursively in any
-   submodules), returning a structure with the renamed module at the top level
-   *)
+(* Descend into the module structure, looking for type_decls and making
+   generators for them.  Repeat the type_decls (since they were taken from
+   something non-concrete) in the final concrete module, alongside the
+   generators. *)
 let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
   match pmtd_type with
   | None -> []
   | Some {pmty_desc; pmty_loc; _} -> match pmty_desc with
     | Pmty_ident _ -> []
-    | Pmty_functor _ | Pmty_with _ | Pmty_typeof _ | Pmty_extension _ |
-      Pmty_alias _ -> raise_errorf ~loc:pmty_loc "%s cannot interpret module \
-      type description %s" deriver pmtd_name.txt
+    | Pmty_functor _ ->
+      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_functor %s" deriver pmtd_name.txt
+    | Pmty_with _  ->
+      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_with %s" deriver pmtd_name.txt
+    | Pmty_extension _  ->
+      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_extension %s" deriver pmtd_name.txt
+    | Pmty_alias lid ->
+      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_alias %s (for %s)" deriver pmtd_name.txt
+        (Longident.flatten lid.txt |> String.concat " ")
+    | Pmty_typeof {pmod_desc; _} -> begin
+        match pmod_desc with
+        | Pmod_ident _ ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_ident %s" deriver pmtd_name.txt
+        | Pmod_unpack _ ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_unpack %s" deriver pmtd_name.txt
+        | Pmod_extension _ ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_extension %s" deriver pmtd_name.txt
+        | Pmod_functor _ ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_functor %s" deriver pmtd_name.txt
+        | Pmod_apply _ ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_apply %s" deriver pmtd_name.txt
+        | Pmod_structure structures ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_structure %s" deriver pmtd_name.txt
+        | Pmod_constraint (module_expression, module_type) ->
+          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_constraint %s" deriver pmtd_name.txt
+
+      end
     | Pmty_signature sigs ->
       let structs =
         List.(flatten @@ map (fun s ->
@@ -371,4 +395,6 @@ let deriver = Ppx_deriving.create deriver
     ~module_type_decl_str:generators_of_module_type
     ()
 
-let () = Ppx_deriving.register deriver
+let () =
+  Printf.printf "ppx_deriving_crowbar main\n%!";
+  Ppx_deriving.register deriver
