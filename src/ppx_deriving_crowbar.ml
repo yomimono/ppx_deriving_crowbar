@@ -382,5 +382,4 @@ let deriver = Ppx_deriving.create deriver
     ()
 
 let () =
-  Printf.printf "ppx_deriving_crowbar main\n%!";
   Ppx_deriving.register deriver
