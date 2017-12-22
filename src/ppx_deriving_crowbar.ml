@@ -320,32 +320,18 @@ let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
   | None -> []
   | Some {pmty_desc; pmty_loc; _} -> match pmty_desc with
     | Pmty_ident _ -> []
-    | Pmty_functor _ ->
-      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_functor %s" deriver pmtd_name.txt
-    | Pmty_with _  ->
-      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_with %s" deriver pmtd_name.txt
-    | Pmty_extension _  ->
-      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_extension %s" deriver pmtd_name.txt
-    | Pmty_alias lid ->
-      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_alias %s (for %s)" deriver pmtd_name.txt
-        (Longident.flatten lid.txt |> String.concat " ")
+    | Pmty_functor _ -> []
+    | Pmty_with _  -> []
+    | Pmty_extension _  -> []
+    | Pmty_alias lid -> []
     | Pmty_typeof {pmod_desc; _} -> begin
         match pmod_desc with
-        | Pmod_ident _ ->
-          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_ident %s" deriver pmtd_name.txt
-        | Pmod_unpack _ ->
-          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_unpack %s" deriver pmtd_name.txt
-        | Pmod_extension _ ->
-          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_extension %s" deriver pmtd_name.txt
-        | Pmod_functor _ ->
-          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_functor %s" deriver pmtd_name.txt
-        | Pmod_apply _ ->
-          raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_apply %s" deriver pmtd_name.txt
+        | Pmod_extension _ | Pmod_functor _ | Pmod_apply _
+        | Pmod_ident _ | Pmod_unpack _ -> []
         | Pmod_structure structures ->
           raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_structure %s" deriver pmtd_name.txt
         | Pmod_constraint (module_expression, module_type) ->
           raise_errorf ~loc:pmty_loc "%s cannot interpret Pmod_constraint %s" deriver pmtd_name.txt
-
       end
     | Pmty_signature sigs ->
       let structs =
