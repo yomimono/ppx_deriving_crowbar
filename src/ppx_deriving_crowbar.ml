@@ -319,7 +319,8 @@ let rec generators_of_module_type ~options ~path { pmtd_name; pmtd_type; _ } =
   match pmtd_type with
   | None -> []
   | Some {pmty_desc; pmty_loc; _} -> match pmty_desc with
-    | Pmty_ident _ -> []
+    | Pmty_ident _ ->
+      raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_ident %s" deriver pmtd_name.txt
     | Pmty_functor _ ->
       raise_errorf ~loc:pmty_loc "%s cannot interpret Pmty_functor %s" deriver pmtd_name.txt
     | Pmty_with _  ->
