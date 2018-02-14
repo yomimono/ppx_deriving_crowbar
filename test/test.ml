@@ -41,6 +41,12 @@ module Rdjeimbo = struct
   and knipp = (string * pnorst)
   and florn = | Fjnie of knipp
   [@@deriving crowbar]
+
+  type t = pnorst * homp [@@deriving crowbar]
+end
+
+module Clorstro = struct
+  type t = [ `Morgthorp of Rdjeimbo.t ] [@@deriving crowbar]
 end
 
 type bar = {
