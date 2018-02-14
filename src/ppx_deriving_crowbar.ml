@@ -242,7 +242,8 @@ let tag_recursive_for_unlazifying type_decls =
       | Ptyp_constr (name, args) ->
         (* need to tag the top-level thing too, if it matches *)
         let core_type =
-          if (0 = String.compare (Longident.last name.txt) needle.ptype_name.txt)
+          let full_name l = Longident.flatten l |> String.concat "." in
+          if (0 = String.compare (full_name name.txt) needle.ptype_name.txt)
           then add_tag core_type
           else core_type
         in
