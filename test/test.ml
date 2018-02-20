@@ -2,13 +2,13 @@ module Glorn : sig
   type snorp
 end = struct
   type snorp = int
-end
+   end
 
 type plot = int [@generator Crowbar.const 1]
 [@@deriving crowbar]
 
-type foo = A of int [@generator Crowbar.const 2]
-         | B of int [@generator Crowbar.map [Crowbar.float] int_of_float]
+type foo = A of int [@generator (Crowbar.const (A 2))]
+         | B of int [@generator Crowbar.map [Crowbar.float] (fun f -> B (int_of_float f))]
 and quux = Q of int | R of foo | D of foo list
 [@@deriving crowbar]
 

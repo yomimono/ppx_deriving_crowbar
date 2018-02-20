@@ -29,7 +29,6 @@ let make_crowbar_list l =
   List.fold_right consify l (Ast_helper.Exp.construct (Ast_convenience.lid
                                                  "Crowbar.[]") None)
 
-(* TODO: this is _definitely_ not right, at least if you seed it with [] *)
 let rec n_vars n (l : string list) =
   if n > 0 then n_vars (n-1) ((Ppx_deriving.fresh_var l)::l)
   else List.rev l
@@ -65,7 +64,6 @@ let rec expr_of_typ quoter typ =
     | [%type: Bytes.t] -> [%expr Crowbar.(map [bytes] Bytes.of_string)]
     | [%type: nativeint]
     | [%type: Nativeint.t] -> [%expr Crowbar.(map [int] Nativeint.of_int)]
-    (* TODO: polymorphic variants *)
     (* also TODO: do we DTRT for [@nobuiltin]?  nope. *)
     | [%type: [%t? typ] option] ->
       [%expr Crowbar.(option [%e expr_of_typ typ])]
@@ -175,51 +173,53 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     (gens, fn_vars_to_record)
   in
   let generator =
-    match type_decl.ptype_kind, type_decl.ptype_manifest with
-    | Ptype_open, _ -> raise_errorf "%s cannot be derived for open type" deriver (* TODO: can we do better? *)
-    | Ptype_abstract, Some manifest ->
-      expr_of_typ quoter manifest
-    | Ptype_abstract, None -> begin
-        match attr_generator type_decl.ptype_attributes with
-        | Some generator -> generator
-        | None ->
-          (* we have a ptype_name foo, so try foo_to_crowbar in the namespace *)
-          app (Exp.ident (Ast_convenience.lid
-                            (Ppx_deriving.mangle_type_decl mangler type_decl)))
+    match attr_generator type_decl.ptype_attributes with
+    | Some generator -> generator
+    | None ->
+      match type_decl.ptype_kind, type_decl.ptype_manifest with
+      | Ptype_open, _ -> raise_errorf "%s cannot be derived for open type" deriver (* TODO: can we do better? *)
+      | Ptype_abstract, Some manifest ->
+        expr_of_typ quoter manifest
+      | Ptype_abstract, None ->
+        (* we have a ptype_name foo, so try foo_to_crowbar in the namespace *)
+        app (Exp.ident (Ast_convenience.lid
+                          (Ppx_deriving.mangle_type_decl mangler type_decl)))
           []
-      end
-    | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
-                                   non-empty list *)
-      let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
-      [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
-    | Ptype_variant constrs, _ ->
-      let cases = constrs |>
-                  List.map (fun {pcd_attributes; pcd_name; pcd_res; pcd_args} ->
-          (* under what circumstances can pcd_res be non-None and pcd_args be
-             populated? *)
-          match pcd_res, pcd_args with
-          | None, Pcstr_tuple [] ->
+      | Ptype_record labels, _ -> (* parsetree.mli promises that this will be a
+                                     non-empty list *)
+        let (gens, fn_vars_to_record) = gens_and_fn_of_labels labels in
+        [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
+      | Ptype_variant constrs, _ ->
+        let cases = constrs |>
+                    List.map (fun {pcd_attributes; pcd_name; pcd_res; pcd_args} ->
+                        match attr_generator pcd_attributes with
+                        | Some generator -> Ppx_deriving.quote quoter generator
+                        | None ->
+                          (* under what circumstances can pcd_res be non-None and pcd_args be
+                             populated? *)
+                          match pcd_res, pcd_args with
+                          | None, Pcstr_tuple [] ->
 
-            let name = Ast_convenience.constr pcd_name.txt [] in
-            [%expr Crowbar.(const [%e name])]
-          | None, Pcstr_tuple tuple ->
-            let (gens, last_fun) = generate_tuple quoter
-                ~constructor:(
-                  Ast_helper.Exp.construct @@ Ast_convenience.lid pcd_name.txt)
-                    tuple in
-            [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
-          | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
-            (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
-            expr_of_typ quoter core_type
-          | None, Pcstr_record labels ->
-            (* C of {...} or C of {...} as t *)
-            let gens, fn_vars_to_record = gens_and_fn_of_labels
-              ~name:(Ast_convenience.lid pcd_name.txt) labels in
-            [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
-        ) in
-      (* we must be sure that there are generators for all of the possible
-         variant types, and then invoke Crowbar.choose on the list of them. *)
-      [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
+                            let name = Ast_convenience.constr pcd_name.txt [] in
+                            [%expr Crowbar.(const [%e name])]
+                          | None, Pcstr_tuple tuple ->
+                            let (gens, last_fun) = generate_tuple quoter
+                                ~constructor:(
+                                  Ast_helper.Exp.construct @@ Ast_convenience.lid pcd_name.txt)
+                                tuple in
+                            [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
+                          | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
+                            (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
+                            expr_of_typ quoter core_type
+                          | None, Pcstr_record labels ->
+                            (* C of {...} or C of {...} as t *)
+                            let gens, fn_vars_to_record = gens_and_fn_of_labels
+                                ~name:(Ast_convenience.lid pcd_name.txt) labels in
+                            [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e fn_vars_to_record])]
+                      ) in
+        (* we must be sure that there are generators for all of the possible
+           variant types, and then invoke Crowbar.choose on the list of them. *)
+        [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   in
   let polymorphize = Ppx_deriving.poly_fun_of_type_decl type_decl in
   let out_type = Ppx_deriving.strong_type_of_type @@ core_type_of_decl ~options
@@ -233,7 +233,7 @@ let tag_recursive_for_unlazifying type_decls =
   let add_tag core_type =
     let loc = Location.mknoloc unlazify_attribute_name in
     let payload : Parsetree.payload =
-       (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr "Crowbar.unlazy"], []))]) in
+      (PStr [(Ast_helper.Str.mk @@ Pstr_eval ([%expr "Crowbar.unlazy"], []))]) in
     let new_tag : Parsetree.attribute = loc, payload in
     Ast_helper.Typ.attr core_type new_tag
   in
