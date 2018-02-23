@@ -8,7 +8,7 @@ type plot = int [@generator Crowbar.const 1]
 [@@deriving crowbar]
 
 type foo = A of int [@generator (Crowbar.const (A 2))]
-         | B of int [@generator Crowbar.map [Crowbar.float] (fun f -> B (int_of_float f))]
+         | B of int [@generator Crowbar.(map [Crowbar.float] (fun f -> B (int_of_float f)))]
 and quux = Q of int | R of foo | D of foo list
 [@@deriving crowbar]
 
@@ -81,6 +81,16 @@ and pune = | A
 and plongle = pune norple
 [@@deriving crowbar]
 
+type krord =
+  | Empty
+  | Nonempty of hlifd list [@generator Crowbar.(map [list1 hlifd_to_crowbar] (fun l -> Nonempty l))]
+[@@deriving crowbar]
+
+type stdord =
+  | Empty
+  | Nonempty of hlifd list
+[@@deriving crowbar { nonempty = true }]
+
 let () =
   Crowbar.(add_test ~name:"everything is awesome"
              [foo_to_crowbar; bar_to_crowbar; quux_to_crowbar]
@@ -88,4 +98,8 @@ let () =
       | A 2 -> true
       | A i -> false
       | _ -> true
-             ))
+             ));
+  Crowbar.(add_test ~name:"nothing is bad"
+             [stdord_to_crowbar] (function
+                 | Nonempty [] -> Crowbar.fail "ugh"
+                 | _ -> ()));

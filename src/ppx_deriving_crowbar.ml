@@ -7,12 +7,16 @@ open Ast_convenience
 let deriver = "crowbar"
 let raise_errorf = Ppx_deriving.raise_errorf
 
-(* currently we ignore all options *)
+(* currently we only know how to deal with one option, so just return its value *)
 let parse_options options =
+  let always_nonempty = ref false in
   options |> List.iter (fun (name, expr) ->
-    match name with
+      match name with
+      | "nonempty" -> always_nonempty := true
       | _ -> raise_errorf ~loc:expr.pexp_loc "%s does not support option %s"
-               deriver name)
+               deriver name);
+  !always_nonempty
+    
 
 let mangler = Ppx_deriving.(`Suffix "to_crowbar")
 let unlazify_attribute_name = "crowbar_recursive_typedef_please_unlazy"
@@ -39,8 +43,8 @@ let last_fun arg function_body = Ast_helper.Exp.fun_ Nolabel None
 
 let lazify e = [%expr lazy [%e e]]
 
-let rec expr_of_typ quoter typ =
-  let expr_of_typ = expr_of_typ quoter in
+let rec expr_of_typ always_nonempty quoter typ =
+  let expr_of_typ = expr_of_typ always_nonempty quoter in
   match attr_generator typ.ptyp_attributes with
   | Some generator -> Ppx_deriving.quote quoter generator
   | None ->
@@ -70,9 +74,11 @@ let rec expr_of_typ quoter typ =
     | [%type: [%t? typ] ref] ->
       [%expr Crowbar.(map [[%e expr_of_typ typ]] (fun a -> ref a))]
     | [%type: [%t? typ] list] ->
-      [%expr Crowbar.(list [%e expr_of_typ typ])]
+      if always_nonempty then [%expr Crowbar.(list1 [%e expr_of_typ typ])]
+      else [%expr Crowbar.(list [%e expr_of_typ typ])]
     | [%type: [%t? typ] array] ->
-      [%expr Crowbar.(map [list [%e expr_of_typ typ]] Array.of_list)]
+      if always_nonempty then [%expr Crowbar.(map [list1 [%e expr_of_typ typ]] Array.of_list)]
+      else [%expr Crowbar.(map [list [%e expr_of_typ typ]] Array.of_list)]
     | [%type: [%t? typ] lazy_t]
     | [%type: [%t? typ] Lazy.t] ->
       [%expr Crowbar.(map [[%e expr_of_typ typ]] (fun a -> lazy a))]
@@ -95,7 +101,7 @@ let rec expr_of_typ quoter typ =
     | false -> [%expr [%e fwd]]
     end
   | { ptyp_desc = Ptyp_tuple tuple } ->
-    let gens, vars_to_tuple = generate_tuple quoter tuple in
+    let gens, vars_to_tuple = generate_tuple always_nonempty quoter tuple in
     [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e vars_to_tuple])]
   | { ptyp_desc = Ptyp_var name } -> Ast_convenience.evar ("poly_"^name)
   | { ptyp_desc = Ptyp_alias (typ, _) } -> expr_of_typ typ
@@ -114,7 +120,7 @@ let rec expr_of_typ quoter typ =
       | Rtag (label, attrs, _, [{ptyp_desc = Ptyp_tuple tuple}]) ->
         (* good ol' tuples *)
         let (gens, last_fun) =
-          generate_tuple quoter
+          generate_tuple always_nonempty quoter
             ~constructor:(Ast_helper.Exp.variant label) tuple in
         [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
       | Rtag (label, attrs, _, [typ] (* one non-tuple thing *)) ->
@@ -131,7 +137,7 @@ let rec expr_of_typ quoter typ =
     [%expr Crowbar.choose [%e (make_crowbar_list cases)]]
   | { ptyp_loc } -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
-and generate_tuple quoter ?constructor tuple =
+and generate_tuple always_nonempty quoter ?constructor tuple =
   let vars = n_vars (List.length tuple) [] in
   let vars_tuple = List.map Ast_convenience.evar vars |> Ast_convenience.tuple in
   let vars_tuple = match constructor with
@@ -139,7 +145,7 @@ and generate_tuple quoter ?constructor tuple =
   | None -> vars_tuple
   in
   let fn_vars_to_tuple = List.fold_right last_fun vars vars_tuple in
-  let gens = List.map (expr_of_typ quoter) tuple in
+  let gens = List.map (expr_of_typ always_nonempty quoter) tuple in
   gens, fn_vars_to_tuple
 
 let core_type_of_decl ~options ~path type_decl =
@@ -150,6 +156,7 @@ let core_type_of_decl ~options ~path type_decl =
     [%type: [%t typ] Crowbar.gen Lazy.t]
 
 let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
+  let always_nonempty = parse_options options in
   let quoter = Ppx_deriving.create_quoter () in
   let path = Ppx_deriving.path_of_type_decl ~path type_decl in
   (* TODO: generalize this to "a list of things that have a type and attributes"
@@ -158,7 +165,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
     let gens = labels |> List.map (fun {pld_type; pld_attributes} ->
         match attr_generator pld_attributes with
         | Some generator -> generator
-        | None -> expr_of_typ quoter pld_type) in
+        | None -> expr_of_typ always_nonempty quoter pld_type) in
     let vars = n_vars (List.length labels) [] in
     let field_assignments = labels |> List.mapi (fun n {pld_name} ->
       let lid = Ast_convenience.lid pld_name.txt in
@@ -179,7 +186,7 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
       match type_decl.ptype_kind, type_decl.ptype_manifest with
       | Ptype_open, _ -> raise_errorf "%s cannot be derived for open type" deriver (* TODO: can we do better? *)
       | Ptype_abstract, Some manifest ->
-        expr_of_typ quoter manifest
+        expr_of_typ always_nonempty quoter manifest
       | Ptype_abstract, None ->
         (* we have a ptype_name foo, so try foo_to_crowbar in the namespace *)
         app (Exp.ident (Ast_convenience.lid
@@ -203,14 +210,14 @@ let str_of_type ~options ~path ({ptype_loc = loc } as type_decl) =
                             let name = Ast_convenience.constr pcd_name.txt [] in
                             [%expr Crowbar.(const [%e name])]
                           | None, Pcstr_tuple tuple ->
-                            let (gens, last_fun) = generate_tuple quoter
+                            let (gens, last_fun) = generate_tuple always_nonempty quoter
                                 ~constructor:(
                                   Ast_helper.Exp.construct @@ Ast_convenience.lid pcd_name.txt)
                                 tuple in
                             [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
                           | Some core_type, Pcstr_tuple _ | Some core_type, Pcstr_record _ ->
                             (* C: T0  or C: T1 * ... * Tn -> T0 or C: {...} -> T0 *)
-                            expr_of_typ quoter core_type
+                            expr_of_typ always_nonempty quoter core_type
                           | None, Pcstr_record labels ->
                             (* C of {...} or C of {...} as t *)
                             let gens, fn_vars_to_record = gens_and_fn_of_labels
@@ -316,7 +323,7 @@ let unlazify type_decl =
 
 let deriver = Ppx_deriving.create deriver
     ~core_type:(Ppx_deriving.with_quoter
-                  (fun quoter typ -> expr_of_typ quoter typ))
+                  (fun quoter typ -> expr_of_typ false quoter typ))
     ~type_decl_str:(fun ~options ~path type_decls ->
         let type_decls = tag_recursive_for_unlazifying type_decls in
         let bodies = List.concat (List.map (str_of_type ~options ~path) type_decls) in
