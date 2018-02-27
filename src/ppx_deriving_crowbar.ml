@@ -116,16 +116,16 @@ let rec expr_of_typ always_nonempty quoter typ =
       | Rinherit typ -> expr_of_typ typ
       | Rtag (label, attrs, _, []) ->
         (* nullary, just use the label name *)
-        [%expr Crowbar.const [%e Ast_helper.Exp.variant label None]]
+        [%expr Crowbar.const [%e Ast_helper.Exp.variant label.txt None]]
       | Rtag (label, attrs, _, [{ptyp_desc = Ptyp_tuple tuple}]) ->
         (* good ol' tuples *)
         let (gens, last_fun) =
           generate_tuple always_nonempty quoter
-            ~constructor:(Ast_helper.Exp.variant label) tuple in
+            ~constructor:(Ast_helper.Exp.variant label.txt) tuple in
         [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
       | Rtag (label, attrs, _, [typ] (* one non-tuple thing *)) ->
         let var = "a" in
-        let body = Ast_helper.Exp.(variant label
+        let body = Ast_helper.Exp.(variant label.txt
             (Some (ident @@ Ast_convenience.lid var))) in
         let fn = last_fun var body in
         [%expr Crowbar.(map [[%e expr_of_typ typ]] [%e fn])]
