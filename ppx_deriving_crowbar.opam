@@ -5,8 +5,8 @@ homepage: "https://somerandomidiot.com"
 bug-reports: "https://github.com/yomimono/ppx_deriving_crowbar/issues"
 dev-repo: "https://github.com/yomimono/ppx_deriving_crowbar.git"
 license: "MIT"
-build:
-[[ "%{make}%" ]]
+build: [[ "%{make}%" ]]
+build-test: [["%{make}%" "test"]]
 available: [ ocaml-version >= "4.06.0" ]
 depends: [
   "ocamlbuild" {build}
