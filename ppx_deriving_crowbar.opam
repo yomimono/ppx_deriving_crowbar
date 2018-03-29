@@ -1,7 +1,7 @@
 opam-version: "1.2"
-maintainer: "ohno@somerandomidiot.com"
-authors: ["don't worry about it"]
-homepage: "https://somerandomidiot.com"
+maintainer: "maintenance@identity-function.com"
+authors: ["Mindy Preston"]
+homepage: "https://github.com/yomimono/ppx_deriving_crowbar"
 bug-reports: "https://github.com/yomimono/ppx_deriving_crowbar/issues"
 dev-repo: "https://github.com/yomimono/ppx_deriving_crowbar.git"
 license: "MIT"
