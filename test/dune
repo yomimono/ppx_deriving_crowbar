@@ -1,0 +1,6 @@
+(test
+ (name test)
+ (libraries crowbar)
+ (preprocess (pps ppx_deriving_crowbar))
+ (flags :standard -w a@5@8@10@11@12@14@23@24@26@29@40)
+)
