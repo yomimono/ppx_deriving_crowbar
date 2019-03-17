@@ -91,6 +91,12 @@ type stdord =
   | Nonempty of hlifd list
 [@@deriving crowbar { nonempty = true }]
 
+type poly_variant = [
+  | `A of int [@generator Crowbar.const (`A 0)]
+]
+[@@deriving crowbar]
+
+
 let () =
   Crowbar.(add_test ~name:"everything is awesome"
              [foo_to_crowbar; bar_to_crowbar; quux_to_crowbar]
@@ -103,3 +109,7 @@ let () =
              [stdord_to_crowbar] (function
                  | Nonempty [] -> Crowbar.fail "ugh"
                  | _ -> ()));
+  Crowbar.(add_test ~name:"polymorphic variants"
+             [poly_variant_to_crowbar] (function
+                 | `A 0 -> ()
+                 | _ -> Crowbar.fail "bah"));
