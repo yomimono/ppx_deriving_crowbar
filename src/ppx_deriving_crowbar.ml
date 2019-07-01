@@ -118,18 +118,25 @@ let rec expr_of_typ always_nonempty quoter typ =
         (* nullary, just use the label name *)
         [%expr Crowbar.const [%e Ast_helper.Exp.variant label.txt None]]
       | Rtag (label, attrs, _, [{ptyp_desc = Ptyp_tuple tuple}]) ->
-        (* good ol' tuples *)
-        let (gens, last_fun) =
-          generate_tuple always_nonempty quoter
-            ~constructor:(Ast_helper.Exp.variant label.txt) tuple in
-        [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
+        begin match attr_generator attrs with
+        | Some generator -> Ppx_deriving.quote quoter generator
+        | None ->
+          (* good ol' tuples *)
+          let (gens, last_fun) =
+            generate_tuple always_nonempty quoter
+              ~constructor:(Ast_helper.Exp.variant label.txt) tuple in
+          [%expr Crowbar.(map [%e (make_crowbar_list gens)] [%e last_fun])]
+        end
       | Rtag (label, attrs, _, [typ] (* one non-tuple thing *)) ->
-        let var = "a" in
-        let body = Ast_helper.Exp.(variant label.txt
-            (Some (ident @@ Ast_convenience.lid var))) in
-        let fn = last_fun var body in
-        [%expr Crowbar.(map [[%e expr_of_typ typ]] [%e fn])]
-                                                 
+        begin match attr_generator attrs with
+        | Some generator -> Ppx_deriving.quote quoter generator
+        | None ->
+          let var = "a" in
+          let body = Ast_helper.Exp.(variant label.txt
+              (Some (ident @@ Ast_convenience.lid var))) in
+          let fn = last_fun var body in
+          [%expr Crowbar.(map [[%e expr_of_typ typ]] [%e fn])]
+        end
       | Rtag (_,_,_,_) -> raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                       deriver (Ppx_deriving.string_of_core_type typ)
     in
